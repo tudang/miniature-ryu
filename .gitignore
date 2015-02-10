@@ -1,1 +1,5 @@
+*.txt
 *.pyc
+*.DS_Store
+*.out
+*.~
