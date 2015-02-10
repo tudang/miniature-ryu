@@ -1,4 +1,4 @@
-import asyncore, socket
+import asyncore, socket, sys
 
 class AsyncoreServerUDP(asyncore.dispatcher):
    def __init__(self):
@@ -17,7 +17,7 @@ class AsyncoreServerUDP(asyncore.dispatcher):
       data, addr = self.recvfrom(2048)
       ip,port = addr
       print str(addr)+" >> "+data
-      with open(str(port) + ".txt", "a") as myfile:
+      with open(sys.argv[1] + "-" + str(port) + ".txt", "a") as myfile:
          myfile.write(data + "\n")
 
    # This is called all the time and causes errors if you leave it out.

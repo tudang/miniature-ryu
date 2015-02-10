@@ -33,11 +33,11 @@ class AsyncoreClientUDP(asyncore.dispatcher):
          sent = self.sendto(self.buffer, (self.server, self.port))
          self.buffer = self.buffer[sent:]
 
-connection = AsyncoreClientUDP("127.0.0.1",5005) # create the "connection"
+connection = AsyncoreClientUDP(sys.argv[1], 5005) # create the "connection"
 for i in range(1, 10000):
    asyncore.loop(count = 10) # Check for upto 10 packets this call?
    x = random.randint(1, 1000000)
    connection.buffer += str(x) #raw_input(" Chat > ") # raw_input (this is a blocking call)
-   with open(sys.argv[1], "a") as cdata:
+   with open(sys.argv[2], "a") as cdata:
        cdata.write(str(x) + "\n")
    
