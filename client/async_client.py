@@ -1,4 +1,20 @@
-import socket, asyncore, random, sys
+#!/usr/bin/python
+
+import socket
+import asyncore 
+import random 
+import sys
+import os
+import string
+import signal
+import time
+
+N=50000
+t=20
+
+def break_handler(signal, frame):
+  print 'Terminated'
+  sys.exit(0)
 
 class AsyncoreClientUDP(asyncore.dispatcher):
 
@@ -6,6 +22,7 @@ class AsyncoreClientUDP(asyncore.dispatcher):
       self.server = server
       self.port = port
       self.buffer = ""
+      signal.signal(signal.SIGINT, break_handler)
 
       # Network Connection Magic!
       asyncore.dispatcher.__init__(self)
@@ -29,15 +46,26 @@ class AsyncoreClientUDP(asyncore.dispatcher):
    # Actually sends the message if there was something in the buffer.
    def handle_write(self):
       if self.buffer != "":
-         print self.buffer
+         #print self.buffer
          sent = self.sendto(self.buffer, (self.server, self.port))
          self.buffer = self.buffer[sent:]
 
+
+def id_generator(size=6, chars=string.ascii_uppercase + string.digits):
+   return ''.join(random.choice(chars) for _ in range(size))
+
 connection = AsyncoreClientUDP(sys.argv[1], 5005) # create the "connection"
-for i in range(1, 10000):
+x = id_generator(int(sys.argv[2])-44)
+start_time = time.time()
+print 'start time: %s' %time.ctime(start_time)
+i = 0
+while((time.time() - start_time) < t):
    asyncore.loop(count = 10) # Check for upto 10 packets this call?
-   x = random.randint(1, 1000000)
-   connection.buffer += str(x) #raw_input(" Chat > ") # raw_input (this is a blocking call)
-   with open(sys.argv[2], "a") as cdata:
-       cdata.write(str(x) + "\n")
+   seq = '%05d' % i
+   data = seq + "--" +  x
+   #print sys.getsizeof(data)
+   connection.buffer += data 
+   with open(sys.argv[3], "a") as cdata:
+       cdata.write(seq + "\n")
+   i = i + 1
    
