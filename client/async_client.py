@@ -55,7 +55,8 @@ def id_generator(size=6, chars=string.ascii_uppercase + string.digits):
    return ''.join(random.choice(chars) for _ in range(size))
 
 connection = AsyncoreClientUDP(sys.argv[1], 5005) # create the "connection"
-x = id_generator(int(sys.argv[2])-44)
+sizekb = int(sys.argv[2]) * 1024
+x = id_generator(sizekb-44)
 start_time = time.time()
 print 'start time: %s' %time.ctime(start_time)
 i = 0
