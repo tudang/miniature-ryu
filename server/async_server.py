@@ -17,16 +17,13 @@ class AsyncoreServerUDP(asyncore.dispatcher):
 
    def break_handler(self, signal, frame):
      print 'Terminated'
-     for f in self.fd:
-        f.close()
+     self.fd.close()
      sys.exit(0)
 
    def __init__(self):
       asyncore.dispatcher.__init__(self)
       signal.signal(signal.SIGINT, self.break_handler)
-      self.fd = []
-      for fn in sys.argv:
-        self.fd.append( open( fn + ".txt", "a"))
+      self.fd = open(sys.argv[1], "a")
 
       # Bind to port %PORT on all interfaces
       self.create_socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -42,8 +39,7 @@ class AsyncoreServerUDP(asyncore.dispatcher):
       ip,port = addr
       #print str(addr)+" >> "+data
       #print sys.getsizeof(data)
-      size = len(self.fd)
-      self.fd[port%size].write(data[0:5] + "\n")
+      self.fd.write(data[0:8] + "," + data[9]  + "\n")
     
    def handle_close(self):
       print 'close server'

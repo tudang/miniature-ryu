@@ -54,19 +54,20 @@ class AsyncoreClientUDP(asyncore.dispatcher):
 def id_generator(size=6, chars=string.ascii_uppercase + string.digits):
    return ''.join(random.choice(chars) for _ in range(size))
 
-connection = AsyncoreClientUDP(sys.argv[1], 5005) # create the "connection"
-sizekb = int(sys.argv[2]) * 1024
-x = id_generator(sizekb-44)
+connection = AsyncoreClientUDP(sys.argv[2], 5005) # create the "connection"
+sizekb = int(sys.argv[3]) * 1024
+x = id_generator(sizekb-48)
 start_time = time.time()
 print 'start time: %s' %time.ctime(start_time)
 i = 0
+client_id = sys.argv[1]
 while((time.time() - start_time) < t):
    asyncore.loop(count = 10) # Check for upto 10 packets this call?
-   seq = '%05d' % i
-   data = seq + "--" +  x
+   seq = '%08d' % i
+   data = seq + "," + client_id + "," +  x
    #print sys.getsizeof(data)
    connection.buffer += data 
-   with open(sys.argv[3], "a") as cdata:
+   with open(sys.argv[4], "a") as cdata:
        cdata.write(seq + "\n")
    i = i + 1
    
