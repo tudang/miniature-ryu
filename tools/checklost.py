@@ -46,6 +46,5 @@ for k,v in clients.items():
   print 'check client %s' % k
   new_seqs = count_lost_and_unorder(v)
   with open("processed-" + sys.argv[1], "a") as f:
-    for seq in seqs:
-      f.write("%s " % seq)
-    f.write("\n")
+    for seq in new_seqs:
+      f.write("%s\n" % seq)
