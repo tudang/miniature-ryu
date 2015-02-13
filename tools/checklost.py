@@ -28,6 +28,7 @@ def count_lost_and_unorder(seqs):
   print 'out of order: %d' % unorder
   if out_of_order:
     print out_of_order[0:10]
+  return seqs
 
 
 with open(sys.argv[1]) as f:
@@ -43,5 +44,8 @@ for l in content:
 for k,v in clients.items():
   print '-' * 40
   print 'check client %s' % k
-  count_lost_and_unorder(v)
-
+  new_seqs = count_lost_and_unorder(v)
+  with open("processed-" + sys.argv[1], "a") as f:
+    for seq in seqs:
+      f.write("%s " % seq)
+    f.write("\n")
