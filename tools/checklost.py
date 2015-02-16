@@ -1,6 +1,20 @@
 #!/usr/bin/python
-
+import os
 import sys
+
+def hamming_distance(s1, s2):
+    """Return the Hamming distance between (un)equal-length sequences"""
+    #if len(s1) != len(s2):
+    #    raise ValueError("Undefined for sequences of unequal length")
+    sum = 0 
+    line = 1 
+    for ch1, ch2 in zip(s1, s2):
+      if ch1 != ch2:
+        print line
+      sum = sum + (ch1 != ch2)
+      line += 1
+    return sum 
+    #return sum(ch1 != ch2 for ch1, ch2 in zip(s1, s2))
 
 def count_lost_and_unorder(seqs):
   count = 0
@@ -41,10 +55,14 @@ for l in content:
   seqs = clients.setdefault(clid, [])
   seqs.append(num)
 
+ham_dist = {}
 for k,v in clients.items():
   print '-' * 40
   print 'check client %s' % k
   new_seqs = count_lost_and_unorder(v)
-  with open("processed-" + sys.argv[1], "a") as f:
+  ham_dist[k] = new_seqs
+  #print ham_dist[k]
+  path, filename = os.path.split(sys.argv[1])
+  with open(path + "/fix-" + filename, "a") as f:
     for seq in new_seqs:
       f.write("%s\n" % seq)
