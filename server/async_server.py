@@ -19,7 +19,7 @@ class AsyncoreServerUDP(asyncore.dispatcher):
 
    def break_handler(self, signal, frame):
       print 'Terminated'
-      self.fd.write(self.data)
+      #self.fd.write(self.data)
       self.fd.close()
       print 'duration %f' % self.duration
       print 'avg rcv rate: %4.2f Mbits/second' % (self.total_bytes * 8 / self.duration / 2**20)
@@ -53,11 +53,10 @@ class AsyncoreServerUDP(asyncore.dispatcher):
       self.total_bytes = self.total_bytes + len(data)
       self.duration = (end - self.start).total_seconds()
       ip,port = addr
-      #print 'received at rate %f' % rate
-      #print 'duration %f' % self.duration
       #print str(addr)+" >> "+data
       #print sys.getsizeof(data)
-      self.data += str(data[0:8] + "," + data[9]  + "\n")
+      #self.data += str(data[0:8] + "," + data[9]  + "\n")
+      self.fd.write(data[0:8] + "," + data[9]  + "\n")
     
    def handle_close(self):
       print 'close server'
