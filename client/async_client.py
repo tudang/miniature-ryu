@@ -10,7 +10,7 @@ import signal
 import time
 
 N=10000
-t=5
+t=10
 
 
 class AsyncoreClientUDP(asyncore.dispatcher):
@@ -41,7 +41,7 @@ class AsyncoreClientUDP(asyncore.dispatcher):
    # If a "connection" is closed do this stuff.
   def handle_close(self):
     print "Closed"
-    self.close()
+    #self.close()
 
    # If a message has arrived, process it.
   def handle_read(self):
