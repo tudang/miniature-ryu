@@ -22,7 +22,8 @@ class AsyncoreServerUDP(asyncore.dispatcher):
       #self.fd.write(self.data)
       self.fd.close()
       print 'duration %f' % self.duration
-      print 'avg rcv rate: %4.2f Mbits/second' % (self.total_bytes * 8 / self.duration / 2**20)
+      if (self.duration != 0):
+        print 'avg rcv rate: %4.2f Mbits/second' % (self.total_bytes * 8 / self.duration / 2**20)
       sys.exit(0)
 
    def __init__(self):
@@ -51,7 +52,9 @@ class AsyncoreServerUDP(asyncore.dispatcher):
       data, addr = self.recvfrom(BUF_SIZE)
       end = datetime.datetime.now()
       self.total_bytes = self.total_bytes + len(data)
-      self.duration = (end - self.start).total_seconds()
+      td = (end -self.start)
+      du = (td.microseconds + (td.seconds + td.days * 24 * 3600) * 10**6) / 10**6
+      self.duration = du
       ip,port = addr
       #print str(addr)+" >> "+data
       #print sys.getsizeof(data)
