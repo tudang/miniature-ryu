@@ -68,6 +68,8 @@ class AsyncoreServerUDP(asyncore.dispatcher):
    # This is called all the time and causes errors if you leave it out.
    def handle_write(self):
       pass
-
+   
+   def writable(self):
+      return False
 AsyncoreServerUDP()
-asyncore.loop()
+asyncore.loop(timeout=5.0)
