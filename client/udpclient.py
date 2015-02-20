@@ -18,7 +18,7 @@ except socket.error:
 host = sys.argv[1]
 port = 8888;
 x = int(sys.argv[2])
-N = x * 1**10
+N = x * 2**10
 cid='1'
 for i in range(1,N):
     msg = str(i) + "," + cid
