@@ -10,7 +10,8 @@ import sys
 HOST = ''   # Symbolic name meaning all available interfaces
 PORT = 8888 # Arbitrary non-privileged port
 dev = sys.argv[1]
- 
+OUTPUT = '/tmp/' + dev + '.txt'
+
 # Datagram (udp) socket
 try :
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -25,6 +26,7 @@ except socket.error, msg :
 # Bind socket to local host and port
 try:
     s.bind((HOST, PORT))
+    out = open(OUTPUT, 'w+')
 except socket.error , msg:
     print 'Bind failed. Error Code : ' + str(msg[0]) + ' Message ' + msg[1]
     sys.exit()
@@ -42,8 +44,9 @@ while 1:
         break
      
     reply = 'OK...' + data
-     
+    out.write(data + '\n')
     #s.sendto(reply , addr)
-    print 'Message[' + addr[0] + ':' + str(addr[1]) + '] - ' + data.strip()
-     
+    #print 'Message[' + addr[0] + ':' + str(addr[1]) + '] - ' + data.strip()
+
+out.close()
 s.close()

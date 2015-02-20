@@ -17,9 +17,11 @@ except socket.error:
  
 host = sys.argv[1]
 port = 8888;
-N = 2**20
+x = int(sys.argv[2])
+N = x * 1**10
+cid='1'
 for i in range(1,N):
-    msg = str(i) + ", client 1"
+    msg = str(i) + "," + cid
      
     try :
         #Set the whole string
