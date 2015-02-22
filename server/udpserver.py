@@ -4,7 +4,7 @@
     Tu Dang (huynh.tu.dang@usi.ch)
 '''
  
-import socket, optparse
+import socket, optparse, sys
 
 def parse_args():
     usage = """usage: %prog [options]
@@ -17,18 +17,20 @@ python udpserver.py eth0
     help = "The port to listen on. Default to 8888."
     parser.add_option('--port', type='int', help=help)
 
-    help = "The interface to listen on. Default is eth0."
-    parser.add_option('--iface', help=help, default='eth0')
-
     help = "The output filename. Default is output.txt"
     parser.add_option('--output', help=help, default='output.txt')
 
     options, args = parser.parse_args()
 
-    return options
+    if len(args) != 1:
+      parser.error("Provide the binding interface")
+
+    iface = args[0]
+
+    return options, iface
 
 def main():
-    options = parse_args()
+    options, iface = parse_args()
     HOST = ''   # Symbolic name meaning all available interfaces
     PORT = 8888 # Arbitrary non-privileged port
 
@@ -36,7 +38,7 @@ def main():
     try :
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        s.setsockopt(socket.SOL_SOCKET, socket.SO_BINDTODEVICE, options.iface + "\0")
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_BINDTODEVICE,iface + "\0")
         print 'Socket created'
     except socket.error, msg :
         print 'Failed to create socket. Error Code : ' + str(msg[0]) + ' Message ' + msg[1]
