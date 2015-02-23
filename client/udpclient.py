@@ -51,7 +51,7 @@ def main():
     start = datetime.now()
     wait = 0
     pad = '*' * (options.ps - 10) # 64 - len(msg)
-    for i in range(1,1000000):
+    for i in range(0,1000000):
         msg = "%08d,%s" % (i, cid+pad)
         try:
             sent = s.sendto(msg, (host, options.port))
@@ -66,8 +66,10 @@ def main():
             
             if du >= options.time:
                 print "wait for %f s." % wait
+                print "last msg: %s" % msg[:10]
                 print "packet-size: %d, duration: %3.2f" % (sent, du)
                 print "bandwidth: %3.2f Mbps" % (total / du * 8 / 2**20)
+                s.close()
                 sys.exit()  
         except socket.error, msg:
             print 'Error Code : ' + str(msg[0]) + ' Message ' + msg[1]
