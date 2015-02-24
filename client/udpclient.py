@@ -4,7 +4,7 @@
 '''
 
  
-import socket, sys, optparse, time
+import socket, sys, optparse, time, select, cStringIO
 from datetime import datetime
  
 def parse_args():
@@ -38,9 +38,11 @@ def parse_args():
 
 def main():
     options, host = parse_args()
+    data = cStringIO.StringIO()
     # create dgram udp socket
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.setblocking(False)
     except socket.error:
         print 'Failed to create socket'
         sys.exit()
@@ -54,26 +56,36 @@ def main():
     for i in range(0,1000000):
         msg = "%08d,%s" % (i, cid+pad)
         try:
-            sent = s.sendto(msg, (host, options.port))
-            total += sent
-            current = datetime.now() 
-            diff = current - start
-            du = diff.total_seconds()
-            rate = total / (du * 100)
-            if rate > Bpms:
-              wait = rate / Bpms / 1000
-              time.sleep(wait)
-            
-            if du >= options.time:
-                print "wait for %f s." % wait
-                print "last msg: %s" % msg[:10]
-                print "packet-size: %d, duration: %3.2f" % (sent, du)
-                print "bandwidth: %3.2f Mbps" % (total / du * 8 / 2**20)
-                s.close()
-                sys.exit()  
+            ready = select.select([], [s], [], 5)
+            if ready[1]:
+                sent = s.sendto(msg, (host, options.port))
+                data.write(msg[:10] + '\n')
+                total += sent
+                current = datetime.now() 
+                diff = current - start
+                du = diff.total_seconds()
+                rate = total / (du * 100)
+                if rate > Bpms:
+                  wait = rate / Bpms / 1000
+                  time.sleep(wait)
+                
+                if du >= options.time:
+                    print "wait for %f s." % wait
+                    print "last msg: %s" % msg[:10]
+                    print "sent total: %d, packet-size: %d, duration: %3.2f" % (total, sent, du)
+                    print "bandwidth: %3.2f Mbps" % (total / du * 8 / 2**20)
+                    break
+            else:
+              print "socket is busy"
         except socket.error, msg:
             print 'Error Code : ' + str(msg[0]) + ' Message ' + msg[1]
             sys.exit()
+
+    with open('data.txt', 'w+') as f:
+      f.write(data.getvalue())
+
+    s.close()
+    sys.exit()  
 
 if __name__ == '__main__':
     main()
