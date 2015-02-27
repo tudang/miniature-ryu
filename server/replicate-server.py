@@ -22,6 +22,10 @@ class UDPServer(object):
             print "write to file %s" % self.output
             td = self.end - self.start
             bw = self.total * 8 / total_seconds(td) / 2**20
+            lost = self.count_lost()
+            print 'lost %f' % lost   
+            with open("record.txt", 'a+') as lf:
+                lf.write(self.iface + ',' + str(bw) + ',' + str(lost) + '\n')
             print 'received: ', self.total
             print 'total seconds %f' % total_seconds(td)
             print 'bandwidth %3.2f Mbps' % bw
@@ -107,19 +111,17 @@ class UDPServer(object):
         return s
 
 
-    def spread_messages(self, data):
-        hosts = ['192.168.3.91', '192.168.4.91','192.168.6.91']#,'192.168.6.91']
+    def spread_messages(self):
+        hosts = ['192.168.3.91', '192.168.4.91','192.168.5.91','192.168.6.91']
         try:
-            ready = select.select([], [self.sendsock], [], 5)
-            if ready[1]:
-                # change self.port to receiver's port
+            if not self.q.empty():
+                data = self.q.get_nowait()
+                #print "[sending]" + data[:10]
                 for host in hosts: 
                     sent = self.sendsock.sendto(data, (host, self.port))
-            else:
-                print "Sending is busy"
         except socket.error, msg:
             print 'Error Code : ' + str(msg[0]) + ' Message ' + msg[1] 
-            
+         
 
     def read_socket(self, BUFSIZE):
         data, addr = self.sock.recvfrom(BUFSIZE)
@@ -127,8 +129,8 @@ class UDPServer(object):
         if not data: 
             raise IOError
         self.end = datetime.now()
+        self.q.put(data)
         self.total += len(data)
-        self.spread_messages(data)
         self.oc.write(data.strip()[:10] + '\n')
         return len(data)
         #print 'Message[' + addr[0] + ':' + str(addr[1]) + '] - ' + data.strip()[:10]
@@ -166,16 +168,19 @@ def main():
     udpserver = UDPServer(iface, options.port, options.output)
     #now keep talking with the client
     data, addr = udpserver.sock.recvfrom(BUFSIZE)
-    udpserver.spread_messages(data)
+    if data:
+        udpserver.q.put(data)
     udpserver.start = datetime.now()
     udpserver.total += len(data)
     udpserver.oc.write(data.strip()[:10] + '\n')
     print "Received from %s" % addr[0]
     udpserver.sock.setblocking(False)
-    ready = select.select([udpserver.sock], [], [], 2)
-    while ready[0]:
-        udpserver.read_socket(BUFSIZE)
-        ready = select.select([udpserver.sock], [], [], 5)
+    while 1:
+        ready = select.select([udpserver.sock], [udpserver.sendsock], [], 5)
+        if ready[0]:
+            udpserver.read_socket(BUFSIZE)
+        elif ready[1]:
+            udpserver.spread_messages()
 
     udpserver.close()
 
