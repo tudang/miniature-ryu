@@ -22,7 +22,7 @@ def parse_args():
     parser.add_option('--bw', help=help, type='int', default=1)
 
     help = "packet size"
-    parser.add_option('--ps', help=help, type='int', default=16*1024)
+    parser.add_option('--ps', help=help, type='int', default=4*1024)
 
     help = "time interval"
     parser.add_option('--time', help=help, type='int', default=10)
@@ -48,23 +48,28 @@ def main():
         sys.exit()
      
     total = 0
-    Bpms = options.bw * 128.0 / 10**2  #(Kbps -> B/10ms)
+    Bpms = (options.bw * 1024)  * 128.0 / 10**2  #(Kbps -> B/10ms)
     cid = options.id
     start = datetime.now()
     wait = 0
     pad = '*' * (options.ps - 10) # 64 - len(msg)
-    for i in range(0,1000000):
+    for i in range(1,1000000):
         msg = "%08d,%s" % (i, cid+pad)
         try:
+            #hosts = ['192.168.3.91', '192.168.4.91',  '192.168.6.91']
             ready = select.select([], [s], [], 5)
             if ready[1]:
+                #for host in hosts:
                 sent = s.sendto(msg, (host, options.port))
                 data.write(msg[:10] + '\n')
                 total += sent
                 current = datetime.now() 
                 diff = current - start
-                du = diff.total_seconds()
-                rate = total / (du * 100)
+                du = total_seconds(diff)
+                if du > 0:
+                    rate = total / (du * 100)
+                else:
+                    rate = 1
                 if rate > Bpms:
                   wait = rate / Bpms / 1000
                   time.sleep(wait)
@@ -86,6 +91,9 @@ def main():
 
     s.close()
     sys.exit()  
+
+def total_seconds(td):
+    return (td.microseconds + (td.seconds + td.days * 24 * 3600) * 10**6) / 10**6
 
 if __name__ == '__main__':
     main()
