@@ -34,22 +34,27 @@ class UDPServer(object):
 
 
     def close(self):
-        print "Close server"
-        with open(self.output, 'w+') as f:
-            f.write(self.oc.getvalue())
-        print "write to file %s" % self.output
-        td = self.end - self.start
-        bw = self.total * 8 / total_seconds(td) / 2**20
-        print 'received: ', self.total
-        print 'total seconds %f' % total_seconds(td)
-        print 'bandwidth %3.2f Mbps' % bw
-        lost = self.count_lost()
-        print 'lost %f' % lost   
-        with open("record.txt", 'a+') as lf:
-            lf.write(self.iface + ',' + str(bw) + ',' + str(lost) + '\n')
-        self.sock.close()
-        self.oc.close()
-        sys.exit()
+        try:
+            print "Close server"
+            with open(self.output, 'w+') as f:
+                f.write(self.oc.getvalue())
+            print "write to file %s" % self.output
+            td = self.end - self.start
+            bw = self.total * 8 / total_seconds(td) / 2**20
+            print 'received: ', self.total
+            print 'total seconds %f' % total_seconds(td)
+            print 'bandwidth %3.2f Mbps' % bw
+            lost = self.count_lost()
+            print 'lost %f' % lost   
+            with open("/tmp/record.txt", 'a+') as lf:
+                lf.write(self.iface + ',' + str(bw) + ',' + str(lost) + '\n')
+        except ZeroDivisionError:
+            print "Do not received anything"
+        finally:
+            print "Cleanup"
+            self.sock.close()
+            self.oc.close()
+            sys.exit()
 
     def count_lost(self):
         current = 1
@@ -83,7 +88,7 @@ class UDPServer(object):
         try :
             s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            #s.setsockopt(socket.SOL_SOCKET, socket.SO_BINDTODEVICE, self.iface + "\0")
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_BINDTODEVICE, self.iface + "\0")
             print 'Socket created'
         except socket.error, msg :
             print 'Failed to create socket. Error Code : ' + str(msg[0]) + ' Message ' + msg[1]
