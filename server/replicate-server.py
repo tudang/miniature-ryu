@@ -118,7 +118,9 @@ class UDPServer(object):
                 data = self.q.get_nowait()
                 #print "[sending]" + data[:10]
                 for host in hosts: 
-                    sent = self.sendsock.sendto(data, (host, self.port))
+                    ready = select.select([], [self.sendsock], [], 1)
+                    if ready[1]:
+                        sent = self.sendsock.sendto(data, (host, self.port))
         except socket.error, msg:
             print 'Error Code : ' + str(msg[0]) + ' Message ' + msg[1] 
          
