@@ -52,16 +52,18 @@ def main():
     cid = options.id
     start = datetime.now()
     wait = 0
-    pad = '*' * (options.ps - 10) # 64 - len(msg)
+    pad = '*' * (options.ps - 26) # 64 - len(msg)
     for i in range(1,1000000):
-        msg = "%08d,%s" % (i, cid+pad)
+        t = datetime.now()
+        tstamp =  '%s' % t.time()
+        msg = "%08d,%s,%s" % (i, tstamp, cid+pad)
         try:
             #hosts = ['192.168.3.91', '192.168.4.91',  '192.168.6.91']
             ready = select.select([], [s], [], 5)
             if ready[1]:
                 #for host in hosts:
                 sent = s.sendto(msg, (host, options.port))
-                data.write(msg[:10] + '\n')
+                data.write(msg[:26] + '\n')
                 total += sent
                 current = datetime.now() 
                 diff = current - start
