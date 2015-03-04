@@ -56,7 +56,7 @@ def main():
     for i in range(1,1000000):
         t = datetime.now()
         tstamp =  '%s' % t.time()
-        msg = "%08d,%s,%s" % (i, tstamp, cid+pad)
+        msg = "%08d,%s,%s" % (i, cid, tstamp+pad)
         try:
             #hosts = ['192.168.3.91', '192.168.4.91',  '192.168.6.91']
             ready = select.select([], [s], [], 5)
