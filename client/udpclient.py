@@ -80,7 +80,7 @@ def main():
                     print "wait for %f s." % wait
                     print "last msg: %s" % msg[:10]
                     print "sent total: %d, packet-size: %d, duration: %3.2f" % (total, sent, du)
-                    print "bandwidth: %3.2f Mbps" % (total / du * 8 / 2**20)
+                    print "bandwidth: %3.2f Mbps" % (total / du * 8 / 10**6)
                     break
             else:
               print "socket is busy"
