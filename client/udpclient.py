@@ -88,7 +88,7 @@ def main():
             print 'Error Code : ' + str(msg[0]) + ' Message ' + msg[1]
             sys.exit()
 
-    with open('data.txt', 'w+') as f:
+    with open('client' + str(cid) + '.csv', 'w+') as f:
       f.write(data.getvalue())
 
     s.close()

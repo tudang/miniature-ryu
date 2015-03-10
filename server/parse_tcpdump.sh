@@ -41,7 +41,8 @@ shift "$((OPTIND-1))" # Shift off the options and optional --.
 #printf '<%s>\n' "$@"
 input=$1
 #sed -e 's/*//g' tmp | cut -c 2-10 |  sed -e '/.\{9\}/!d' -e 's/,//g' > tmp2
-strings $1 | grep -o '\([[:digit:]]\{8\},\)' | cut -c 1-8 > $output_file
-wc -l $output_file
-diff -u ~/miniature-ryu/client/client.txt $output_file | grep ^[+-].[0-9] | wc -l
+#strings $1 | grep -o '\([[:digit:]]\{8\},\)' | cut -c 1-8 > $output_file
+strings $1 | grep -o '[0-9]\{8\},[0-9],[0-9]\{2\}:[0-9]\{2\}:[0-9]\{2\}.[0-9]\{6\}' > $output_file
+diff -u ~/miniature-ryu/client/data.txt $output_file | grep ^[+-].[0-9] | wc -l
+rm $output_file
 # End of file
