@@ -22,7 +22,7 @@ def parse_args():
     parser.add_option('--bw', help=help, type='int', default=1)
 
     help = "packet size"
-    parser.add_option('--ps', help=help, type='int', default=4*1024)
+    parser.add_option('--ps', help=help, type='int', default=1024)
 
     help = "time interval"
     parser.add_option('--time', help=help, type='int', default=10)
