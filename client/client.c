@@ -9,6 +9,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <time.h>
+#include <sys/time.h>
 
 #define MAX 1470
 
@@ -20,14 +21,15 @@ void error(const char *msg)
 
 int main(int argc, char *argv[])
 {
-    int sock, n, i;
+    int sock, n, i, j;
     unsigned int length;
     struct sockaddr_in server, from;
     struct hostent *hp;
     char buffer[MAX];
-    struct timespec tstart={0,0}, tend={0,0}, res;
+    struct timeval tstart, tend, res;
+    fd_set writefds;
 
-    if (argc != 3) { printf("Usage: server port\n");
+    if (argc != 4) { printf("Usage: server port N\n");
                         exit(1);
     }
     sock = socket(AF_INET, SOCK_DGRAM, 0);
@@ -42,41 +44,44 @@ int main(int argc, char *argv[])
          hp->h_length);
     server.sin_port = htons(atoi(argv[2]));
     length = sizeof(struct sockaddr_in);
+
+    FD_ZERO(&writefds);
+
+    FD_SET(sock, &writefds);
+
     struct timespec req = {0};
-    int milisec = 1;
-    int micro = 1;
+    int micro = 600;
     req.tv_sec = 0;
     req.tv_nsec = micro * 1.0e3;
     long total;
-    clock_gettime(CLOCK_REALTIME, &tstart);
+    gettimeofday(&tstart, NULL);
     int npacket=1.0e6;
-    for(i=0; i < npacket; i++) {
-        memset(buffer, '@', 1470);
-        char msgid[8]; 
-        sprintf(msgid, "%08d", i);
-        strncpy(buffer, msgid, 8);
-        clock_gettime(CLOCK_REALTIME, &tstart);
-        n = sendto(sock, buffer, strlen(buffer), 0, (struct sockaddr *)&server, length);
-        if (n < 0) error("sendto");
-        total += n;
-        //nanosleep(&req, (struct timespec *)NULL);
-        clock_gettime(CLOCK_REALTIME, &tend);
-        double duration = ((double)tend.tv_sec*1E9 + tend.tv_nsec) - 
-        ((double)tstart.tv_sec*1E9 + tstart.tv_nsec);
-        printf("some_long_computation took about %.5f nanoseconds\n", duration);
+    int N = atoi(argv[3]);
+    char* msgid; 
+    msgid = (char *) malloc(8);
+    int count;
+    for(i=0; i < npacket/N; i++) {
+        for(j=0; j < N; j++) {
+            memset(buffer, '@', MAX);
+            sprintf(msgid, "%08d", count++);
+            strncpy(buffer, msgid, 8);
+            int activity = select(sock+1, NULL, &writefds, NULL, NULL);
+                if (activity) {
+                    if (FD_ISSET(sock, &writefds)) {
+                n = sendto(sock, buffer, strlen(buffer), 0, 
+                            (struct sockaddr *)&server, length);
+                if (n < 0) error("sendto");
+                total += n;
+                }
+            }
+        }
+        nanosleep(&req, (struct timespec *)NULL);
     }
-    //fwrite(buffer, 16, 1, stdout);
-    clock_gettime(CLOCK_REALTIME, &tend);
-    //printf("strlen(buffer): %d\n", strlen(buffer));
-    double duration = ((double)tend.tv_sec*1.0e3 + 1.0e-6*tend.tv_nsec) - 
-    ((double)tstart.tv_sec*1.0e3 + 1.0e-6*tstart.tv_nsec);
-    printf("some_long_computation took about %.5f milliseconds\n", duration);
-    printf("Total bytes sent %d\n", total);
+    gettimeofday(&tend, NULL);
+    timersub(&tend, &tstart, &res);
+    double duration = res.tv_sec + res.tv_usec*1E-6;
+    printf("Duration: %.6f\n", duration);
     printf("Throughput: %.2f\n", ((double)total * 8 / duration * 1.0e-6));
-    //n = recvfrom(sock, buffer, 256, 0, (struct sockaddr *) &from, &length);
-    //    //if (n < 0) error("recvfrom");
-    //        //write(1, "Got an ack: ",12);
-    //            //write(1, buffer, n);
     close(sock);
     return 0;
 }
