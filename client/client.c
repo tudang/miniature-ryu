@@ -11,7 +11,7 @@
 #include <time.h>
 #include <sys/time.h>
 
-#define MAX 1470
+#define MAX 1000
 
 void error(const char *msg)
 {
@@ -26,7 +26,7 @@ int main(int argc, char *argv[])
     struct sockaddr_in server, from;
     struct hostent *hp;
     char buffer[MAX];
-    struct timeval tstart, tend, res;
+    struct timeval tstart={0,0}, tend={0,0}, res;
     fd_set writefds;
 
     if (argc != 4) { printf("Usage: server port N\n");
@@ -53,13 +53,13 @@ int main(int argc, char *argv[])
     int micro = 600;
     req.tv_sec = 0;
     req.tv_nsec = micro * 1.0e3;
-    long total;
+    long total = 0;
     gettimeofday(&tstart, NULL);
     int npacket=1.0e6;
     int N = atoi(argv[3]);
     char* msgid; 
     msgid = (char *) malloc(8);
-    int count;
+    int count = 0;
     for(i=0; i < npacket/N; i++) {
         for(j=0; j < N; j++) {
             memset(buffer, '@', MAX);
@@ -79,10 +79,11 @@ int main(int argc, char *argv[])
     }
     gettimeofday(&tend, NULL);
     timersub(&tend, &tstart, &res);
-    double duration = res.tv_sec + res.tv_usec*1E-6;
+    double duration = res.tv_sec + res.tv_usec*1.0e-6;
     printf("Duration: %.6f\n", duration);
     printf("Throughput: %.2f\n", ((double)total * 8 / duration * 1.0e-6));
+    printf("Packet/second: %.0f\n", ((double)count) / duration );
+    printf("Number of sent msg: %d\n", count);
     close(sock);
     return 0;
 }
-
