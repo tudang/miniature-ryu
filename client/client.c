@@ -12,6 +12,7 @@
 #include <sys/time.h>
 
 #define MAX 1000
+#define NPACKET 100000
 
 void error(const char *msg)
 {
@@ -56,12 +57,11 @@ int main(int argc, char *argv[])
     req.tv_nsec = micro * 1.0e3;
     long total = 0;
     gettimeofday(&tstart, NULL);
-    int npacket=1.0e6;
     int N = atoi(argv[3]);
     char* msgid; 
     msgid = (char *) malloc(8);
     int count = 0;
-    for(i=0; i < npacket/N; i++) {
+    for(i=0; i < (NPACKET / N); i++) {
         for(j=0; j < N; j++) {
             memset(buffer, '@', MAX);
             sprintf(msgid, "%2d%06d", client_id, count++);
