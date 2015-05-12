@@ -77,6 +77,8 @@ void *evalFunc(void *args)
     while (counter == 0) {sleep(1);}
     
     int j, i = 0, k = 0;
+    int decided_counter = 0;
+    int undecided_counter = 0;
     while (i < counter) {
         int an_instance[4];
         for (j = 0; j < 4; j++) {
@@ -89,12 +91,16 @@ void *evalFunc(void *args)
             }
         }
         int selected = findMajorityElement(an_instance, 4); 
-        printf("%8d\n", selected);
+        if (selected != -1) decided_counter++;
+        else undecided_counter++;
+        //printf("%8d\n", selected);
         learn[k++] = selected;
         i++;
         if (i == counter) sleep(1);
     }
-    printf("End eval: counter=%d\n", counter);
+    printf("End eval: k=%d counter=%d\n", k, counter);
+    printf("Percentage of undicided req: %.2f\n",
+            (double)undecided_counter / counter * 100);
 }
 
 
