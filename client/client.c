@@ -29,9 +29,10 @@ int main(int argc, char *argv[])
     struct timeval tstart={0,0}, tend={0,0}, res;
     fd_set writefds;
 
-    if (argc != 4) { printf("Usage: server port N\n");
+    if (argc != 5) { printf("Usage: server port N\n");
                         exit(1);
     }
+    int client_id = atoi(argv[4]);
     sock = socket(AF_INET, SOCK_DGRAM, 0);
     if (sock <0) error("socket");
 
@@ -63,7 +64,7 @@ int main(int argc, char *argv[])
     for(i=0; i < npacket/N; i++) {
         for(j=0; j < N; j++) {
             memset(buffer, '@', MAX);
-            sprintf(msgid, "%08d", count++);
+            sprintf(msgid, "%2d%06d", client_id, count++);
             strncpy(buffer, msgid, 8);
             int activity = select(sock+1, NULL, &writefds, NULL, NULL);
                 if (activity) {
