@@ -16,6 +16,7 @@
 pthread_t tid[4]; // this is thread identifier
 
 int values[4][MAX_NUM];  // value queues
+uint64_t ltc[MAX_NUM];
 bool start = false;
 int counter = 0;
 pthread_mutex_t lock;
@@ -73,8 +74,8 @@ void *recvFunc(void *arg)
         struct timespec start = {atoi(sec), atoi(nsec)};
         //printf("%d.%d\n", start.tv_sec, start.tv_nsec);
         uint64_t diff = BILLION * (end.tv_sec - start.tv_sec) + end.tv_nsec - start.tv_nsec;
-        printf("latency = %llu nanoseconds\n", (long long unsigned int) diff);
-        
+        //printf("latency = %llu us\n", (long long unsigned int) diff / 1000);
+        ltc[inst] = diff;
         last_msg[9] = '\0'; // place the null terminator
         last_id = atoi(last_msg);
         //printf("index:%d\tinstance:%d\n", index, inst);
@@ -93,7 +94,7 @@ void *evalFunc(void *args)
 {
     int learn[MAX_NUM];
     while (counter == 0) {sleep(1);}
-    printf("start eval\n");
+    //printf("start eval\n");
     struct timeval tstart={0,0}, tend={0,0}, res;
     gettimeofday(&tstart, NULL);
     int j, i = 0, k = 0;
@@ -116,13 +117,14 @@ void *evalFunc(void *args)
         //printf("inst:%d chosen:%8d\n", i, selected);
         learn[k++] = selected;
         i++;
+        /*
         if ((i%50000) == 0) {
             //sleep(1); // wait a little for new values to come
             //printf("in waiting i:%d counter: %d\n", i, counter);
             printf(".");
         }
+        */
     }
-    printf("\n");
     gettimeofday(&tend, NULL);
     timersub(&tend, &tstart, &res);
     double duration = res.tv_sec  + res.tv_usec*1.0e-6;
@@ -131,6 +133,15 @@ void *evalFunc(void *args)
     printf("Ratio of undicided req: %.5f\n",
                             (double)undecided_counter / counter);
     
+    uint64_t avg_ltc = 0.0; 
+    int count = 0;
+    for (i=0; i < MAX_NUM; i++) {
+        if(ltc[i] != 0) {
+            avg_ltc += ltc[i];
+            count++;
+        }
+    }
+    printf("avg_latency: %lld\n", avg_ltc, count, avg_ltc/count);
     FILE *out;
     char filename[20];
     char *tname;
@@ -146,16 +157,6 @@ void *evalFunc(void *args)
         fprintf(out, "%d\n", learn[i]);
     }
     fclose(out);
-    /*
-    gettimeofday(&tend, NULL);
-    timersub(&tend, &tstart, &res);
-    double duration = res.tv_sec  + res.tv_usec*1.0e-6;
-    printf("Duration: %.6f\n", duration);
-    printf("Packet/second: %0.f\n", ((double) counter / duration));
-    printf("End eval: k=%d counter=%d\n", k, counter);
-    printf("Ratio of undicided req: %.5f\n",
-            (double)undecided_counter / counter);
-    */
 }
 
 
@@ -188,7 +189,7 @@ int main(int argc, char**argv)
     
      if (pthread_mutex_init(&lock, NULL) != 0)
     {
-        printf("\n mutex init failed\n");
+        perror("mutex init failed\n");
         return 1;
     }
 
@@ -209,9 +210,5 @@ int main(int argc, char**argv)
 
     for(i = 0; i < count; i++) {
        pthread_join(tid[i], (void**)&(ptr[i])); 
-    }
-
-    for(i = 0; i < count; i++) {
-       printf("Last received msg: [%d]\n", *ptr[i]);
     }
 }
