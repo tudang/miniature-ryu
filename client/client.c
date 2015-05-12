@@ -12,7 +12,7 @@
 #include <sys/time.h>
 
 #define MAX 1000
-#define NPACKET 100000
+#define NPACKET 1000000
 
 void error(const char *msg)
 {
@@ -52,6 +52,7 @@ int main(int argc, char *argv[])
     FD_SET(sock, &writefds);
 
     struct timespec req = {0};
+    struct timespec tsp = {0,0};
     int micro = 600;
     req.tv_sec = 0;
     req.tv_nsec = micro * 1.0e3;
@@ -64,8 +65,11 @@ int main(int argc, char *argv[])
     for(i=0; i < (NPACKET / N); i++) {
         for(j=0; j < N; j++) {
             memset(buffer, '@', MAX);
-            sprintf(msgid, "%2d%06d", client_id, count++);
-            strncpy(buffer, msgid, 8);
+            clock_gettime(CLOCK_REALTIME, &tsp);
+            printf("%lld.%.9ld\n", (long long)tsp.tv_sec, tsp.tv_nsec);
+            sprintf(msgid, "%2d%06d%lld.%.9ld", client_id, count++, 
+                                 (long long) tsp.tv_sec, tsp.tv_nsec);
+            strncpy(buffer, msgid, 28);
             int activity = select(sock+1, NULL, &writefds, NULL, NULL);
                 if (activity) {
                     if (FD_ISSET(sock, &writefds)) {

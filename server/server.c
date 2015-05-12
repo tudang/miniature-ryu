@@ -10,7 +10,9 @@
 
 #define PORT 8888
 #define SIZE 1470
-#define MAX_NUM 200000 - 20
+#define MAX_NUM 2000000 - 20
+#define BILLION 1000000000L
+
 pthread_t tid[4]; // this is thread identifier
 
 int values[4][MAX_NUM];  // value queues
@@ -38,6 +40,8 @@ void *recvFunc(void *arg)
     self_id = pthread_self();
     //printf("index:%d interface %s\n", index, itf);
     char last_msg[9];
+    char sec[10];
+    char nsec[9];
     int last_id = 0;
     int inst = 0;
     sockfd=socket(AF_INET,SOCK_DGRAM,0);
@@ -54,12 +58,23 @@ void *recvFunc(void *arg)
     servaddr.sin_port=htons(PORT);
     bind(sockfd,(struct sockaddr *)&servaddr,sizeof(servaddr));
     
+    
+    struct timespec end;
+ 
     for (;;)
     {
         if (inst >= MAX_NUM) break;
         len = sizeof(cliaddr);
         n = recvfrom(sockfd,mesg,SIZE,0,(struct sockaddr *)&cliaddr,&len);
+        clock_gettime(CLOCK_REALTIME, &end);
         strncpy(last_msg, mesg, 8);
+        strncpy(sec, mesg+8, 10);
+        strncpy(nsec, mesg+19, 9);
+        struct timespec start = {atoi(sec), atoi(nsec)};
+        //printf("%d.%d\n", start.tv_sec, start.tv_nsec);
+        uint64_t diff = BILLION * (end.tv_sec - start.tv_sec) + end.tv_nsec - start.tv_nsec;
+        printf("latency = %llu nanoseconds\n", (long long unsigned int) diff);
+        
         last_msg[9] = '\0'; // place the null terminator
         last_id = atoi(last_msg);
         //printf("index:%d\tinstance:%d\n", index, inst);
@@ -101,19 +116,20 @@ void *evalFunc(void *args)
         //printf("inst:%d chosen:%8d\n", i, selected);
         learn[k++] = selected;
         i++;
-        if ((i%20000) == 0) {
-            gettimeofday(&tend, NULL);
-            timersub(&tend, &tstart, &res);
-            double duration = res.tv_sec  + res.tv_usec*1.0e-6;
-            printf("Duration: %.6f\n", duration);
-            printf("Packet/second: %0.f\n", ((double) counter / duration));
-            printf("End eval: k=%d counter=%d\n", k, counter);
-            printf("Ratio of undicided req: %.5f\n",
-                                    (double)undecided_counter / counter);
+        if ((i%50000) == 0) {
             //sleep(1); // wait a little for new values to come
-            printf("in waiting i:%d counter: %d\n", i, counter);
+            //printf("in waiting i:%d counter: %d\n", i, counter);
+            printf(".");
         }
     }
+    printf("\n");
+    gettimeofday(&tend, NULL);
+    timersub(&tend, &tstart, &res);
+    double duration = res.tv_sec  + res.tv_usec*1.0e-6;
+    printf("Duration: %.6f\n", duration);
+    printf("Packet/second: %0.f\n", ((double) counter / duration));
+    printf("Ratio of undicided req: %.5f\n",
+                            (double)undecided_counter / counter);
     
     FILE *out;
     char filename[20];
@@ -161,6 +177,7 @@ int findMajorityElement(int* arr, int size) {
         return majorityElement;
     return -1;
 }
+
 
 
 int main(int argc, char**argv)
