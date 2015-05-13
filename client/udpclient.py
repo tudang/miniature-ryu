@@ -18,11 +18,11 @@ def parse_args():
     help = "The server's listening port"
     parser.add_option('--port', help=help, type='int', default=8888)
   
-    help = "The sending throughput"
-    parser.add_option('--bw', help=help, type='int', default=1)
+    help = "The sending speed"
+    parser.add_option('--ss', help=help, type='int', default=50)
 
     help = "packet size"
-    parser.add_option('--ps', help=help, type='int', default=1024)
+    parser.add_option('--ps', help=help, type='int', default=1470)
 
     help = "time interval"
     parser.add_option('--time', help=help, type='int', default=10)
@@ -47,46 +47,40 @@ def main():
         print 'Failed to create socket'
         sys.exit()
      
-    total = 0
-    Bpms = (options.bw * 1024)  * 128.0 / 10**2  #(Kbps -> B/10ms)
+    total = 0L
     cid = options.id
     start = datetime.now()
     wait = 0
     pad = '*' * (options.ps - 26) # 64 - len(msg)
-    for i in range(1,1000000):
+    N = options.ss
+    npacket = 10**5 / N
+    delta = 30
+    count = 0
+    begin = datetime.now()
+    while (True):
+        #for j in range(1,N):
         t = datetime.now()
+        dur = total_seconds(t - begin)
+        if (dur >= delta): 
+            break
         tstamp =  '%s' % t.time()
-        msg = "%08d,%s,%s" % (i, cid, tstamp+pad)
+        msg = "%08d,%s,%s" % (count, cid, tstamp+pad)
+        count += 1
         try:
-            #hosts = ['192.168.3.91', '192.168.4.91',  '192.168.6.91']
-            ready = select.select([], [s], [], 5)
+            ready = select.select([], [s], [], 0.001)
             if ready[1]:
-                #for host in hosts:
                 sent = s.sendto(msg, (host, options.port))
                 data.write(msg[:26] + '\n')
                 total += sent
-                current = datetime.now() 
-                diff = current - start
-                du = total_seconds(diff)
-                if du > 0:
-                    rate = total / (du * 100)
-                else:
-                    rate = 1
-                if rate > Bpms:
-                  wait = rate / Bpms / 1000
-                  time.sleep(wait)
-                
-                if du >= options.time:
-                    print "wait for %f s." % wait
-                    print "last msg: %s" % msg[:10]
-                    print "sent total: %d, packet-size: %d, duration: %3.2f" % (total, sent, du)
-                    print "bandwidth: %3.2f Mbps" % (total / du * 8 / 10**6)
-                    break
             else:
-              print "socket is busy"
+                print "socket is busy"
         except socket.error, msg:
             print 'Error Code : ' + str(msg[0]) + ' Message ' + msg[1]
             sys.exit()
+        time.sleep(0.001)
+    du = total_seconds(datetime.now() - start)
+    print "sent total: %d,  duration: %3.2f" % (total, du)
+    print "bandwidth: %3.2f Mbps" % (total / du * 8 / 10**6)
 
     with open('client' + str(cid) + '.csv', 'w+') as f:
       f.write(data.getvalue())

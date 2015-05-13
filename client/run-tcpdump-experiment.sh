@@ -14,11 +14,11 @@ EOF
 dir="pcap"
 PS=4
 BW=10
-T=10
+N=10
 verbose=0
 save=false
 OPTIND=1 # Reset is necessary if getopts was used previously in the script.  It is a good idea to make this local in a function.
-while getopts "hvsp:b:t:" opt ; do
+while getopts "hvsn:" opt ; do
     case "$opt" in
         h)
             show_help
@@ -29,11 +29,7 @@ while getopts "hvsp:b:t:" opt ; do
              ;;
         v)  verbose=$((verbose+1))
              ;;
-        p)  PS=$OPTARG
-             ;;
-        b)  BW=$OPTARG
-             ;;
-        t)  T=$OPTARG
+        n)  N=$OPTARG
              ;;
         '?')
             show_help >&2
@@ -48,7 +44,7 @@ ssh node81 -t "sudo ntpdate gateway"
 ssh node90 -t "sudo ntpdate gateway"
 ssh node91 -t "sudo ntpdate gateway"
 
-ssh node91 -t 'sudo nohup bash -c "tcpdump -nnts 1514 -i eth0   -w /tmp/eth0.1.pcap \( udp dst port 8888 \) >> /tmp/nohup.out 2>&1 &"'
+ssh node91 -t 'sudo nohup bash -c "tcpdump -nnts 1514 -i eth0.1   -w /tmp/eth0.1.pcap \( udp dst port 8888 \) >> /tmp/nohup.out 2>&1 &"'
 ssh node91 -t 'sudo nohup bash -c "tcpdump -nnts 1514 -i eth1.2 -w /tmp/eth1.2.pcap \( udp dst port 8888 \) >> /tmp/nohup.out 2>&1 &"'
 ssh node91 -t 'sudo nohup bash -c "tcpdump -nnts 1514 -i eth2.3 -w /tmp/eth2.3.pcap \( udp dst port 8888 \) >> /tmp/nohup.out 2>&1 &"'
 ssh node91 -t 'sudo nohup bash -c "tcpdump -nnts 1514 -i eth3.4 -w /tmp/eth3.4.pcap \( udp dst port 8888 \) >> /tmp/nohup.out 2>&1 &"'
@@ -56,9 +52,9 @@ ssh node90 -t 'sudo nohup bash -c "tcpdump -nnts 1514 -i eth0.5 -w /tmp/eth0.5.p
 ssh node90 -t 'sudo nohup bash -c "tcpdump -nnts 1514 -i eth1.6 -w /tmp/eth1.6.pcap \( udp dst port 8888 \) >> /tmp/nohup.out 2>&1 &"'
 ssh node90 -t 'sudo nohup bash -c "tcpdump -nnts 1514 -i eth2.7 -w /tmp/eth2.7.pcap \( udp dst port 8888 \) >> /tmp/nohup.out 2>&1 &"'
 ssh node90 -t 'sudo nohup bash -c "tcpdump -nnts 1514 -i eth3.8 -w /tmp/eth3.8.pcap \( udp dst port 8888 \) >> /tmp/nohup.out 2>&1 &"'
-echo "./udpclient.py node91 --ps $[$PS*1024] --bw $BW --time $T"
-ssh node81 'nohup bash -c "miniature-ryu/client/udpclient.py --ps '$[$PS*1024]' --id 1 --bw '$BW' --time '$T' node91 > miniature-ryu/client/node81.log 2>&1 &"'
-./udpclient.py node91 --id 2 --ps $[$PS*1024] --bw $BW --time $T
+echo "./client host91 8888 $N"
+ssh node81 'nohup bash -c "miniature-ryu/client/client host91 8888 '$N' > miniature-ryu/client/node81.log 2>&1 &"'
+./client host91 8888 $N
 
 sleep 5
 
