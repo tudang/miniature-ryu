@@ -9,10 +9,13 @@
 #include <sys/time.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <pthread.h>
+#include <errno.h>
+
 
 #define PORT 8888
 #define SIZE 1470
-#define MAX_NUM 1000000 - 20
+#define MAX_NUM 1000000 + 5
 #define BILLION 1000000000L
 
 pthread_t tid[4]; // this is thread identifier
@@ -23,6 +26,11 @@ bool start = false;
 int counter = 0;
 pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 int idx = 0;
+
+pthread_cond_t      cond  = PTHREAD_COND_INITIALIZER;
+pthread_mutex_t     mutex = PTHREAD_MUTEX_INITIALIZER;
+
+
 struct thread_args {
     int index;
     char *itf;
@@ -54,14 +62,6 @@ void *recvFunc(void *arg)
         perror("Setsockopt Error\n");
         exit(1);    
     } 
-    fcntl(sockfd, F_SETFL, O_NONBLOCK);
-    struct timeval timeout;
-    timeout.tv_sec =  30;
-    timeout.tv_usec = 0;
-    fd_set readfds;
-    
-    FD_ZERO(&readfds);
-    FD_SET(sockfd, &readfds);
 
  
     bzero(&servaddr,sizeof(servaddr));
@@ -75,43 +75,35 @@ void *recvFunc(void *arg)
  
     for (;;)
     {
-        select(sockfd+1, &readfds, NULL, NULL, &timeout);
-        if (FD_ISSET(sockfd, &readfds)) {
-            len = sizeof(cliaddr);
-            n = recvfrom(sockfd,mesg,SIZE,0,(struct sockaddr *)&cliaddr,&len);
+        len = sizeof(cliaddr);
+        n = recvfrom(sockfd,mesg,SIZE,0,(struct sockaddr *)&cliaddr,&len);
 
-            clock_gettime(CLOCK_REALTIME, &end);
+        clock_gettime(CLOCK_REALTIME, &end);
 
-            strncpy(last_msg, mesg, 8);
-            strncpy(sec, mesg+8, 10);
-            strncpy(nsec, mesg+19, 9);
+        strncpy(last_msg, mesg, 8);
+        strncpy(sec, mesg+8, 10);
+        strncpy(nsec, mesg+19, 9);
 
-            struct timespec start = {atoi(sec), atoi(nsec)};
-            //printf("%d.%d\n", start.tv_sec, start.tv_nsec);
-            uint64_t diff = BILLION * (end.tv_sec - start.tv_sec) + end.tv_nsec - start.tv_nsec;
-            //printf("latency = %llu us\n", (long long unsigned int) diff / 1000);
-            ltc[inst] = diff;
-            
-            /*
-            // unfair locking
-            pthread_mutex_lock(&lock);
-            if(inst > counter) 
-            {
-                counter = inst;
-            }
-            pthread_mutex_unlock(&lock);
-            */
-            if (index == 0) counter++;
-            //printf("index: %d counter:%d\n", index, counter);
-            last_msg[9] = '\0'; // place the null terminator
-            last_id = atoi(last_msg);
-            values[index][inst] = last_id;  
-            inst++;
+        struct timespec start = {atoi(sec), atoi(nsec)};
+        //printf("%d.%d\n", start.tv_sec, start.tv_nsec);
+        uint64_t diff = BILLION * (end.tv_sec - start.tv_sec) + end.tv_nsec - start.tv_nsec;
+        //printf("latency = %llu us\n", (long long unsigned int) diff / 1000);
+        ltc[inst] = diff;
+        
+        
+        pthread_mutex_lock(&lock);
+        if(inst > counter) 
+        {
+            counter = inst;
         }
-        else {
-            printf("Index: %d counter: %d Socket Timeout\n", index, counter); 
-            break;
-        }
+        pthread_mutex_unlock(&lock);
+       
+        //if (index == 0) counter++;
+        //printf("index: %d counter:%d\n", index, counter);
+        last_msg[9] = '\0'; // place the null terminator
+        last_id = atoi(last_msg);
+        values[index][inst] = last_id;  
+        inst++;
     }
     pthread_exit(&last_id);
     return NULL;
@@ -122,20 +114,56 @@ void *evalFunc(void *args)
     int learn[MAX_NUM];
     while (counter == 0) {sleep(1);}
     printf("start eval\n");
-    struct timeval tstart={0,0}, tend={0,0}, res;
-    gettimeofday(&tstart, NULL);
+    struct timespec tstart={0,0}, tend={0,0}, res;
+    clock_gettime(CLOCK_REALTIME, &tstart);
     int j, i = 0, k = 0;
     int decided_counter = 0;
     int undecided_counter = 0;
 
-    while (i < counter) { 
+    uint64_t avg_ltc = 0.0; 
+
+    FILE *out;
+    char filename[20];
+    char *tname;
+    tname  = (char *)args;
+    sprintf(filename, "/tmp/%s", tname);
+    printf("filename:%s\n", filename);
+    out = fopen(filename ,"w");
+
+    if (out == NULL) {
+        perror("Error opening file");
+        exit(1);
+    }
+
+    int rc;
+    struct timespec ts;
+    struct timeval  tp;
+    
+    rc = pthread_mutex_lock(&mutex);
+
+    while (true) { 
+        rc =  gettimeofday(&tp, NULL);
+        /* Convert from timeval to timespec */
+        ts.tv_sec  = tp.tv_sec;
+        ts.tv_nsec = tp.tv_usec * 1000;
+        ts.tv_sec += 1; // WAIT_TIME_SECONDS;
         int an_instance[4];
         for (j = 0; j < 4; j++) {
             if (values[j][i] != 0) 
                 an_instance[j] = values[j][i];
             else  {
-                while (values[j][i] == 0)  {}
-                an_instance[j] = values[j][i];
+                while (values[j][i] == 0)  {
+                    printf("Thread blocked: interface %d\n", j);
+                    rc = pthread_cond_timedwait(&cond, &mutex, &ts);
+                    if (rc == ETIMEDOUT) {
+                        printf("Wait timed out!\n");
+                        rc = pthread_mutex_unlock(&mutex);
+                        an_instance[j] = -2;
+                        break;
+                    }
+                    else     
+                        an_instance[j] = values[j][i];
+                }
             }
         }
         int selected = findMajorityElement(an_instance, 4); 
@@ -144,41 +172,25 @@ void *evalFunc(void *args)
        
         //printf("inst:%d chosen:%8d\n", i, selected);
         learn[k++] = selected;
+        fprintf(out, "%d\n", selected);
+        // aggregate latency
+        avg_ltc += ltc[i];
+        if ((i%100000) == 0) {
+            clock_gettime(CLOCK_REALTIME, &tend);
+            uint64_t res = BILLION * (tend.tv_sec - tstart.tv_sec) + tend.tv_nsec - tstart.tv_nsec;
+            double duration =  res*1.0e-9;
+            printf("Duration: %.6f\n", duration);
+            printf("Packet/second: %0.f\n", ((double) counter / duration));
+            printf("Ratio of undicided req: %.5f\n",
+                                    (double)undecided_counter / counter);
+            printf("avg_latency: %.2f us\n", 1.0e-3*avg_ltc/((double)i+1));
+            fflush(out);
+        }
+        // Next instance
         i++;
-        if (i == counter) sleep(1);
     }
 
-    gettimeofday(&tend, NULL);
-    timersub(&tend, &tstart, &res);
-    double duration = res.tv_sec - 1 + res.tv_usec*1.0e-6;
-    printf("Duration: %.6f\n", duration);
-    printf("Packet/second: %0.f\n", ((double) counter / duration));
-    printf("Ratio of undicided req: %.5f\n",
-                            (double)undecided_counter / counter);
     
-    uint64_t avg_ltc = 0.0; 
-    int count = 0;
-    for (i=0; i < MAX_NUM; i++) {
-        if(ltc[i] != 0) {
-            avg_ltc += ltc[i];
-            count++;
-        }
-    }
-    printf("avg_latency: %lld\n", avg_ltc, count, avg_ltc/count);
-    FILE *out;
-    char filename[20];
-    char *tname;
-    tname  = (char *)args;
-    sprintf(filename, "/tmp/%s", tname);
-    printf("filename:%s\n", filename);
-    out = fopen(filename ,"w");
-    if (out == NULL) {
-        perror("Error opening file");
-        exit(1);
-    }
-    for (i=0; i < MAX_NUM; i++) {
-        fprintf(out, "%d\n", learn[i]);
-    }
     fclose(out);
 }
 
