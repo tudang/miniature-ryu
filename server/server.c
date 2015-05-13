@@ -140,7 +140,6 @@ void *evalFunc(void *args)
     struct timeval  tp;
     
     rc = pthread_mutex_lock(&mutex);
-
     while (true) { 
         rc =  gettimeofday(&tp, NULL);
         /* Convert from timeval to timespec */
@@ -149,16 +148,19 @@ void *evalFunc(void *args)
         ts.tv_sec += 1; // WAIT_TIME_SECONDS;
         int an_instance[4];
         for (j = 0; j < 4; j++) {
-            if (values[j][i] != 0) 
+            if (values[j][i] != 0)  {
                 an_instance[j] = values[j][i];
+                //printf("%.8d  ", values[j][i]);
+            } 
             else  {
                 while (values[j][i] == 0)  {
-                    printf("Thread blocked: interface %d\n", j);
+                    //printf("Thread blocked: interface %d\n", j);
                     rc = pthread_cond_timedwait(&cond, &mutex, &ts);
                     if (rc == ETIMEDOUT) {
-                        printf("Wait timed out!\n");
+                        //printf("Wait timed out!\n");
                         rc = pthread_mutex_unlock(&mutex);
                         an_instance[j] = -2;
+                        //printf("%8s ", "");
                         break;
                     }
                     else     
@@ -166,6 +168,7 @@ void *evalFunc(void *args)
                 }
             }
         }
+        //printf("\n");
         int selected = findMajorityElement(an_instance, 4); 
         if (selected != -1) decided_counter++;
         else undecided_counter++;
