@@ -11,8 +11,8 @@
 #include <time.h>
 #include <sys/time.h>
 
-#define MAX 1000
-#define NPACKET 1000000
+#define MAX 1470
+#define NPACKET 500000
 
 void error(const char *msg)
 {
@@ -66,7 +66,7 @@ int main(int argc, char *argv[])
         for(j=0; j < N; j++) {
             memset(buffer, '@', MAX);
             clock_gettime(CLOCK_REALTIME, &tsp);
-            printf("%lld.%.9ld\n", (long long)tsp.tv_sec, tsp.tv_nsec);
+            //printf("%lld.%.9ld\n", (long long)tsp.tv_sec, tsp.tv_nsec);
             sprintf(msgid, "%2d%06d%lld.%.9ld", client_id, count++, 
                                  (long long) tsp.tv_sec, tsp.tv_nsec);
             strncpy(buffer, msgid, 28);
