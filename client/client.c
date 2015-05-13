@@ -53,7 +53,7 @@ int main(int argc, char *argv[])
 
     struct timespec req = {0};
     struct timespec tsp = {0,0};
-    int micro = 600;
+    int micro = 3000;
     req.tv_sec = 0;
     req.tv_nsec = micro * 1.0e3;
     long total = 0;
