@@ -7,10 +7,12 @@
 #include <pthread.h>
 #include <stdbool.h>
 #include <sys/time.h>
+#include <unistd.h>
+#include <fcntl.h>
 
 #define PORT 8888
 #define SIZE 1470
-#define MAX_NUM 2000000 - 20
+#define MAX_NUM 1000000 - 20
 #define BILLION 1000000000L
 
 pthread_t tid[4]; // this is thread identifier
@@ -19,7 +21,7 @@ int values[4][MAX_NUM];  // value queues
 uint64_t ltc[MAX_NUM];
 bool start = false;
 int counter = 0;
-pthread_mutex_t lock;
+pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 int idx = 0;
 struct thread_args {
     int index;
@@ -52,6 +54,15 @@ void *recvFunc(void *arg)
         perror("Setsockopt Error\n");
         exit(1);    
     } 
+    fcntl(sockfd, F_SETFL, O_NONBLOCK);
+    struct timeval timeout;
+    timeout.tv_sec =  30;
+    timeout.tv_usec = 0;
+    fd_set readfds;
+    
+    FD_ZERO(&readfds);
+    FD_SET(sockfd, &readfds);
+
  
     bzero(&servaddr,sizeof(servaddr));
     servaddr.sin_family = AF_INET;
@@ -64,27 +75,43 @@ void *recvFunc(void *arg)
  
     for (;;)
     {
-        if (inst >= MAX_NUM) break;
-        len = sizeof(cliaddr);
-        n = recvfrom(sockfd,mesg,SIZE,0,(struct sockaddr *)&cliaddr,&len);
-        clock_gettime(CLOCK_REALTIME, &end);
-        strncpy(last_msg, mesg, 8);
-        strncpy(sec, mesg+8, 10);
-        strncpy(nsec, mesg+19, 9);
-        struct timespec start = {atoi(sec), atoi(nsec)};
-        //printf("%d.%d\n", start.tv_sec, start.tv_nsec);
-        uint64_t diff = BILLION * (end.tv_sec - start.tv_sec) + end.tv_nsec - start.tv_nsec;
-        //printf("latency = %llu us\n", (long long unsigned int) diff / 1000);
-        ltc[inst] = diff;
-        last_msg[9] = '\0'; // place the null terminator
-        last_id = atoi(last_msg);
-        //printf("index:%d\tinstance:%d\n", index, inst);
-        values[index][inst] = last_id;  
-        //pthread_mutex_lock(&lock);
-        if (counter < inst) counter = inst;
-        //pthread_mutex_unlock(&lock);
-        inst++;
-        // condition to end the received loop
+        select(sockfd+1, &readfds, NULL, NULL, &timeout);
+        if (FD_ISSET(sockfd, &readfds)) {
+            len = sizeof(cliaddr);
+            n = recvfrom(sockfd,mesg,SIZE,0,(struct sockaddr *)&cliaddr,&len);
+
+            clock_gettime(CLOCK_REALTIME, &end);
+
+            strncpy(last_msg, mesg, 8);
+            strncpy(sec, mesg+8, 10);
+            strncpy(nsec, mesg+19, 9);
+
+            struct timespec start = {atoi(sec), atoi(nsec)};
+            //printf("%d.%d\n", start.tv_sec, start.tv_nsec);
+            uint64_t diff = BILLION * (end.tv_sec - start.tv_sec) + end.tv_nsec - start.tv_nsec;
+            //printf("latency = %llu us\n", (long long unsigned int) diff / 1000);
+            ltc[inst] = diff;
+            
+            /*
+            // unfair locking
+            pthread_mutex_lock(&lock);
+            if(inst > counter) 
+            {
+                counter = inst;
+            }
+            pthread_mutex_unlock(&lock);
+            */
+            if (index == 0) counter++;
+            //printf("index: %d counter:%d\n", index, counter);
+            last_msg[9] = '\0'; // place the null terminator
+            last_id = atoi(last_msg);
+            values[index][inst] = last_id;  
+            inst++;
+        }
+        else {
+            printf("Index: %d counter: %d Socket Timeout\n", index, counter); 
+            break;
+        }
     }
     pthread_exit(&last_id);
     return NULL;
@@ -94,13 +121,14 @@ void *evalFunc(void *args)
 {
     int learn[MAX_NUM];
     while (counter == 0) {sleep(1);}
-    //printf("start eval\n");
+    printf("start eval\n");
     struct timeval tstart={0,0}, tend={0,0}, res;
     gettimeofday(&tstart, NULL);
     int j, i = 0, k = 0;
     int decided_counter = 0;
     int undecided_counter = 0;
-    while (i < MAX_NUM) { // minus a few messages in buffer
+
+    while (i < counter) { 
         int an_instance[4];
         for (j = 0; j < 4; j++) {
             if (values[j][i] != 0) 
@@ -117,17 +145,12 @@ void *evalFunc(void *args)
         //printf("inst:%d chosen:%8d\n", i, selected);
         learn[k++] = selected;
         i++;
-        /*
-        if ((i%50000) == 0) {
-            //sleep(1); // wait a little for new values to come
-            //printf("in waiting i:%d counter: %d\n", i, counter);
-            printf(".");
-        }
-        */
+        if (i == counter) sleep(1);
     }
+
     gettimeofday(&tend, NULL);
     timersub(&tend, &tstart, &res);
-    double duration = res.tv_sec  + res.tv_usec*1.0e-6;
+    double duration = res.tv_sec - 1 + res.tv_usec*1.0e-6;
     printf("Duration: %.6f\n", duration);
     printf("Packet/second: %0.f\n", ((double) counter / duration));
     printf("Ratio of undicided req: %.5f\n",
@@ -186,13 +209,13 @@ int main(int argc, char**argv)
     int i, err;
     int count = 0;
     int *ptr[4];
-    
+   /* 
      if (pthread_mutex_init(&lock, NULL) != 0)
     {
         perror("mutex init failed\n");
         return 1;
     }
-
+    */
 
     for(i = 1; i < argc-1; i++) {
         err = pthread_create(&tid[count++], NULL, recvFunc, argv[i]);
