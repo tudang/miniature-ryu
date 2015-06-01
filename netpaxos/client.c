@@ -38,6 +38,7 @@ int main(int argc, char *argv[])
     char sec[10];
     char nsec[9];
     int last_id = 0;
+    long long int total_latency = 0;
 
     if (argc != 5) { printf("Usage: server port N\n");
                         exit(1);
@@ -115,7 +116,8 @@ int main(int argc, char *argv[])
                     //printf("Srt:%lld.%.9ld\n", (long long) send_tbl[last_id].tv_sec, send_tbl[last_id].tv_nsec);
                     uint64_t diff = BILLION * (end.tv_sec - send_tbl[last_id].tv_sec) +
                                     end.tv_nsec - send_tbl[last_id].tv_nsec;
-                    printf("%6d\t%llu us\n", last_id, (long long unsigned int) diff / 2000);
+                    //printf("%6d\t%llu us\n", last_id, (long long unsigned int) diff / 2000);
+                    total_latency += (diff / 2000);
                 }
             }
         }
@@ -128,6 +130,8 @@ int main(int argc, char *argv[])
     printf("Throughput: %.2f\n", ((double)total * 8 / duration * 1.0e-6));
     printf("Packet/second: %.0f\n", ((double)count) / duration );
     printf("Number of sent msg: %d\n", count);
+    printf("Avg. Latency: %3.2f\n", ((float) total_latency / count));
+    
     close(sock);
     return 0;
 }
