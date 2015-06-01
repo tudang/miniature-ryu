@@ -72,14 +72,14 @@ void *recvFunc(void *arg)
     
     
     struct timespec end;
+    char buf[SIZE];
  
     for (;;)
     {
         len = sizeof(cliaddr);
         n = recvfrom(sockfd,mesg,SIZE,0,(struct sockaddr *)&cliaddr,&len);
-
+        
         clock_gettime(CLOCK_REALTIME, &end);
-
         strncpy(last_msg, mesg, 8);
         strncpy(sec, mesg+8, 10);
         strncpy(nsec, mesg+19, 9);
@@ -100,10 +100,11 @@ void *recvFunc(void *arg)
        
         //if (index == 0) counter++;
         //printf("index: %d counter:%d\n", index, counter);
-        last_msg[9] = '\0'; // place the null terminator
+        //last_msg[9] = '\0'; // place the null terminator
         last_id = atoi(last_msg);
         values[index][inst] = last_id;  
         inst++;
+        n = sendto(sockfd,last_msg,strlen(last_msg), 0, (struct sockaddr *)&cliaddr, len);
     }
     pthread_exit(&last_id);
     return NULL;
