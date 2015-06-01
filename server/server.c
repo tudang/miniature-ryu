@@ -167,6 +167,7 @@ void *evalFunc(void *args)
                         an_instance[j] = values[j][i];
                 }
             }
+            fprintf(out,"%.8d\t", an_instance[j]);
         }
         //printf("\n");
         int selected = findMajorityElement(an_instance, 4); 
@@ -175,7 +176,7 @@ void *evalFunc(void *args)
        
         //printf("inst:%d chosen:%8d\n", i, selected);
         learn[k++] = selected;
-        fprintf(out, "%d\n", selected);
+        fprintf(out, "%.8d\n", selected);
         // aggregate latency
         avg_ltc += ltc[i];
         if ((i%100000) == 0) {
