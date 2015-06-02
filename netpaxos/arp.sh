@@ -1,0 +1,12 @@
+#!/bin/bash
+ssh -t node90 'sudo arp -s 192.168.4.81 00:1a:a0:0a:42:72'
+ssh -t node90 'sudo arp -s 192.168.4.82 00:1a:a0:0b:14:73'
+ssh -t node91 'sudo arp -s 192.168.4.81 00:1a:a0:0a:42:72' 
+ssh -t node91 'sudo arp -s 192.168.4.82 00:1a:a0:0b:14:73' 
+ssh -t node82 'sudo arp -s 192.168.4.91 d4:ae:52:ea:4c:23' 
+ssh -t node80 'sudo arp -s 192.168.4.83 00:1a:a0:0a:37:bd' 
+ssh -t node83 'sudo arp -s 192.168.4.80 00:1a:a0:0a:3b:9a' 
+ssh -t node84 'sudo arp -s 192.168.4.85 00:1a:a0:0a:45:d3' 
+ssh -t node85 'sudo arp -s 192.168.4.84 00:1a:a0:0a:42:78' 
+ssh -t node88 'sudo arp -s 192.168.4.76 00:1a:a0:0a:45:be' 
+ssh -t node76 'sudo arp -s 192.168.4.88 00:1a:a0:0a:45:d6' 
