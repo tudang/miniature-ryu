@@ -2,6 +2,7 @@ ovs-vsctl del-br br4
 
 ovs-vsctl add-br br4 -- set bridge br4 datapath_type=pica8
 ovs-ofctl del-flows br4
+ovs-vsctl add-port br4 ge-1/1/25 vlan_mode=access tag=1 -- set Interface ge-1/1/25 type=pica8
 ovs-vsctl add-port br4 ge-1/1/26 vlan_mode=access tag=1 -- set Interface ge-1/1/26 type=pica8
 ovs-vsctl add-port br4 ge-1/1/27 vlan_mode=trunk trunks=1,9 -- set Interface ge-1/1/27 type=pica8
 ovs-vsctl add-port br4 ge-1/1/28 vlan_mode=trunk trunks=1,9 -- set Interface ge-1/1/28 type=pica8
