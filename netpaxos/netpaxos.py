@@ -54,6 +54,9 @@ class SimpleSwitch(app_manager.RyuApp):
                 ofutils.ip_src_dst_popvlan(dp, 0x0800, 4, '192.168.4.91', 
                                   '192.168.4.82', 2) 
 
+                ofutils.send_normal_flow(dp, 7, '192.168.4.83', 8)
+                ofutils.send_normal_flow(dp, 8, '192.168.4.80', 7)
+
         elif (msg.datapath_id == 0xca13c454444f2bab):
                 print "br1 connected"
                 ofutils.add_group(dp, 1, 33, 37)
@@ -67,6 +70,9 @@ class SimpleSwitch(app_manager.RyuApp):
                 # send to eth1.2(node91)
                 ofutils.forward_ports(dp, 37, 38)
                 ofutils.mod_eth_dst_vlan(dp, 5, 38, 'D4:AE:52:EA:4C:25', 2, 14)
+
+                ofutils.send_normal_flow(dp, 9, '192.168.4.85', 10)
+                ofutils.send_normal_flow(dp, 10, '192.168.4.84', 9)
 
         elif (msg.datapath_id == 0xa182c454444f2bab):
                 print "br2 connected"
@@ -82,6 +88,9 @@ class SimpleSwitch(app_manager.RyuApp):
                 ofutils.forward_ports(dp, 39, 40)
                 ofutils.mod_eth_dst_vlan(dp, 5, 40, 'D4:AE:52:EA:4C:27', 3, 19)
 
+                ofutils.send_normal_flow(dp, 20, '192.168.4.86', 21)
+                ofutils.send_normal_flow(dp, 21, '192.168.4.88', 20)
+
         elif (msg.datapath_id == 0x3079c454444f2bc4):
                 print "br3 connected"
                 ofutils.add_group(dp, 1, 33, 37)
@@ -95,6 +104,9 @@ class SimpleSwitch(app_manager.RyuApp):
                 # send to eth3.4(node91)
                 ofutils.forward_ports(dp, 37, 38)
                 ofutils.mod_eth_dst_vlan(dp, 5, 38, 'D4:AE:52:EA:4C:29', 4, 24)
+
+                ofutils.send_normal_flow(dp, 20, '192.168.4.77', 19)
+                ofutils.send_normal_flow(dp, 19, '192.168.4.76', 20)
 
         elif (msg.datapath_id == 0x59abc454444f2bc4):
                 print "br4 connected"
@@ -128,6 +140,8 @@ class SimpleSwitch(app_manager.RyuApp):
                                   '192.168.3.90', 
                                   '192.168.3.91',[27]) 
 
+                ofutils.send_normal_flow(dp, 25, '192.168.4.72', 26)
+                ofutils.send_normal_flow(dp, 26, '192.168.4.71', 25)
 
     @set_ev_cls(ofp_event.EventOFPErrorMsg,
             [HANDSHAKE_DISPATCHER, CONFIG_DISPATCHER, MAIN_DISPATCHER])

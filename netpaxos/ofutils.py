@@ -159,7 +159,7 @@ def send_normal_flow(datapath, in_port, ipdst, out_port):
     ofp_parser = datapath.ofproto_parser
     priority = 32
     match = ofp_parser.OFPMatch(in_port=in_port, eth_type=0x0800, 
-                                ip_proto=0x11, ipv4_dst=ipdst)
+                                ipv4_dst=ipdst)
     actions = [ofp_parser.OFPActionOutput(out_port)]
     send_msg(datapath, priority, match, actions)
 
@@ -221,6 +221,13 @@ def send_arp_flow(datapath, priority, nw_dst, outports):
     actions = []
     for p in outports:
         actions.append(ofp_parser.OFPActionOutput(p))
+    send_msg(datapath, priority, match, actions)
+
+def broadcast_arp(datapath, priority, nw_dst):
+    ofp = datapath.ofproto
+    ofp_parser = datapath.ofproto_parser
+    match = ofp_parser.OFPMatch(eth_type=0x0806, arp_tpa=nw_dst)
+    actions = [ofp_parser.OFPActionOutput(ofp.OFPP_FLOOD, 0)]
     send_msg(datapath, priority, match, actions)
 
 def del_all_flows(datapath):
