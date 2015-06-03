@@ -31,23 +31,52 @@ struct server {
     unsigned int length;
 };
 
+struct timespec send_tbl[NPACKET] = {1,1};
+
 void *sendMsg(void *arg)
 {
     fd_set write_fd_set;
     struct server *s = (struct server*) arg;
     int sock = s->socket;
-    char buffer[] = "hello";
+    char buffer[MAX];
+
+    struct timespec tsp;
+    struct timespec req = {0};
+    req.tv_sec = 0;
+    req.tv_nsec = 1;
+
+    int total = 0;
+    int count = 0;
+    int client_id = 81;
+    char msgid[28];
+
+
+
+    memset(buffer, '@', MAX);
 
     FD_ZERO(&write_fd_set);
     FD_SET(sock, &write_fd_set);
 
-    int activity = select(sock+1, NULL, &write_fd_set, NULL, NULL);
-    if (activity) {
-        if (FD_ISSET(sock, &write_fd_set)) {
-            int n = sendto(sock, buffer, strlen(buffer), 0, 
-                        (struct sockaddr *)&s->server, s->length);
-            printf("send %d bytes\n", n);
+    while (count < NPACKET) {
+        int activity = select(sock+1, NULL, &write_fd_set, NULL, NULL);
+        if (activity) {
+            if (FD_ISSET(sock, &write_fd_set)) {
+                // get timestamp and attach to message
+                clock_gettime(CLOCK_REALTIME, &tsp);
+                sprintf(msgid, "%2d%06d%lld.%.9ld", client_id, count,
+                        (long long) tsp.tv_sec, tsp.tv_nsec);
+                strncpy(buffer, msgid, 28);
+                // put (value,timestamp)
+                send_tbl[count] = tsp;
+                int n = sendto(sock, buffer, strlen(buffer), 0, 
+                            (struct sockaddr *)&s->server, s->length);
+                if (n < 0) error("sendto");
+                total += n;
+                //printf("send %d bytes: [%s]\n", n, msgid);
+            }
         }
+        count++;
+        nanosleep(&req, (struct timespec *)NULL);
     }
 
 
@@ -60,19 +89,39 @@ void *recvMsg(void *arg)
     struct server *s = (struct server*) arg;
     int sock = s->socket;
     char recvbuf[MAX];
-    struct timeval timeout = {5, 0};
+    struct timeval timeout = {30, 0};
+    char last_msg[6];
+    int last_id;
+    long long int total_latency = 0;
+    int count = 0;
 
     FD_ZERO(&read_fd_set);
     FD_SET(sock, &read_fd_set);
 
-    int activity = select(sock+1, &read_fd_set, NULL, NULL, &timeout);
-    if (activity) {
-        if(FD_ISSET(sock, &read_fd_set)) {
-            int n = recvfrom(sock, recvbuf, MAX, 0, NULL, NULL);
-            printf("recv %d bytes\n", n);
-        }
+    while(1) {
+        int activity = select(sock+1, &read_fd_set, NULL, NULL, &timeout);
+        if (activity) {
+            if(FD_ISSET(sock, &read_fd_set)) {
+                int n = recvfrom(sock, recvbuf, MAX, 0, NULL, NULL);
+                if (n < 0) error("recvfrom");
+                strncpy(last_msg, recvbuf+2, 6);
+                last_id = atoi(last_msg);
+                struct timespec end;
+                clock_gettime(CLOCK_REALTIME, &end);
+                uint64_t diff = BILLION * (end.tv_sec - send_tbl[last_id].tv_sec) +
+                                    end.tv_nsec - send_tbl[last_id].tv_nsec;
+                total_latency += (diff / 2000);
+                count++;
+                printf("recv %d bytes: %s\n", n, recvbuf);
+            }
+            else break;
+        } 
+        
     }
-    else printf("timeout after 5 seconds\n");
+
+    printf("Avg. Latency: %ld / %d = %3.2f\n", total_latency, count,
+             ((float) total_latency / count));
+
     return NULL;
 }
 
@@ -118,7 +167,8 @@ int main(int argc, char **argv)
 
     /* wait for our thread to finish before continuing */
     pthread_join(sth, NULL);
-    pthread_join(rth, NULL);
+    sleep(5);
+    pthread_cancel(rth);
 
     printf("Main exit.\n"); 
 
