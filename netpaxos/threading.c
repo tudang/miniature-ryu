@@ -35,51 +35,6 @@ struct timespec send_tbl[NPACKET] = {1,1};
 
 void *sendMsg(void *arg)
 {
-    fd_set write_fd_set;
-    struct server *s = (struct server*) arg;
-    int sock = s->socket;
-    char buffer[MAX];
-
-    struct timespec tsp;
-    struct timespec req = {0};
-    req.tv_sec = 0;
-    req.tv_nsec = 1;
-
-    int total = 0;
-    int count = 0;
-    int client_id = 81;
-    char msgid[28];
-
-
-
-    memset(buffer, '@', MAX);
-
-    FD_ZERO(&write_fd_set);
-    FD_SET(sock, &write_fd_set);
-
-    while (count < NPACKET) {
-        int activity = select(sock+1, NULL, &write_fd_set, NULL, NULL);
-        if (activity) {
-            if (FD_ISSET(sock, &write_fd_set)) {
-                // get timestamp and attach to message
-                clock_gettime(CLOCK_REALTIME, &tsp);
-                sprintf(msgid, "%2d%06d%lld.%.9ld", client_id, count,
-                        (long long) tsp.tv_sec, tsp.tv_nsec);
-                strncpy(buffer, msgid, 28);
-                // put (value,timestamp)
-                send_tbl[count] = tsp;
-                int n = sendto(sock, buffer, strlen(buffer), 0, 
-                            (struct sockaddr *)&s->server, s->length);
-                if (n < 0) error("sendto");
-                total += n;
-                //printf("send %d bytes: [%s]\n", n, msgid);
-            }
-        }
-        count++;
-
-        if ((count % 5) == 0) 
-            nanosleep(&req, (struct timespec *)NULL);
-    }
 
 
     return NULL;
@@ -167,11 +122,54 @@ int main(int argc, char **argv)
 
 
     /* Create worker thread */
-    pthread_create(&sth, NULL, sendMsg, (void*) serv);
     pthread_create(&rth, NULL, recvMsg, (void*) serv);
 
+    /* Sending in Main thread */
+    fd_set write_fd_set;
+    char buffer[MAX];
+
+    struct timespec tsp;
+    struct timespec req = {0};
+    req.tv_sec = 0;
+    req.tv_nsec = 1;
+
+    int total = 0;
+    int count = 0;
+    int client_id = 81;
+    char msgid[28];
+    int N = atoi(argv[1]);
+
+
+
+    memset(buffer, '@', MAX);
+
+    FD_ZERO(&write_fd_set);
+    FD_SET(sock, &write_fd_set);
+
+    while (count < NPACKET) {
+        int activity = select(sock+1, NULL, &write_fd_set, NULL, NULL);
+        if (activity) {
+            if (FD_ISSET(sock, &write_fd_set)) {
+                // get timestamp and attach to message
+                clock_gettime(CLOCK_REALTIME, &tsp);
+                sprintf(msgid, "%2d%06d%lld.%.9ld", client_id, count,
+                        (long long) tsp.tv_sec, tsp.tv_nsec);
+                strncpy(buffer, msgid, 28);
+                // put (value,timestamp)
+                send_tbl[count] = tsp;
+                int n = sendto(sock, buffer, strlen(buffer), 0, 
+                            (struct sockaddr *)&server_addr, length);
+                if (n < 0) error("sendto");
+                total += n;
+                //printf("send %d bytes: [%s]\n", n, msgid);
+            }
+        }
+        count++;
+
+        if ((count % N) == 0) 
+            nanosleep(&req, (struct timespec *)NULL);
+    }
     /* wait for our thread to finish before continuing */
-    pthread_join(sth, NULL);
     sleep(5);
     pthread_cancel(rth);
 
