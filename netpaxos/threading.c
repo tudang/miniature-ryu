@@ -16,7 +16,7 @@
 #define HOST "192.168.4.91"
 #define PORT 8888
 #define MAX 1470
-#define NPACKET 500000
+#define NPACKET 500001
 #define BILLION 1000000000L
 
 void error(const char *msg)
@@ -76,7 +76,9 @@ void *sendMsg(void *arg)
             }
         }
         count++;
-        nanosleep(&req, (struct timespec *)NULL);
+
+        if ((count % 5) == 0) 
+            nanosleep(&req, (struct timespec *)NULL);
     }
 
 
@@ -99,7 +101,7 @@ void *recvMsg(void *arg)
     FD_SET(sock, &read_fd_set);
 
     while(1) {
-        int activity = select(sock+1, &read_fd_set, NULL, NULL, &timeout);
+        int activity = select(sock+1, &read_fd_set, NULL, NULL, NULL);
         if (activity) {
             if(FD_ISSET(sock, &read_fd_set)) {
                 int n = recvfrom(sock, recvbuf, MAX, 0, NULL, NULL);
@@ -112,15 +114,18 @@ void *recvMsg(void *arg)
                                     end.tv_nsec - send_tbl[last_id].tv_nsec;
                 total_latency += (diff / 2000);
                 count++;
-                printf("recv %d bytes: %s\n", n, recvbuf);
+                // printf("recv %d bytes: %s\n", n, recvbuf);
             }
-            else break;
         } 
+        
+        if ((count%100000) == 0)
+        {
+            printf("Avg. Latency: %ld / %d = %3.2f\n", total_latency, count,
+            ((float) total_latency / count));
+        }
         
     }
 
-    printf("Avg. Latency: %ld / %d = %3.2f\n", total_latency, count,
-             ((float) total_latency / count));
 
     return NULL;
 }
