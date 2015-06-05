@@ -12,6 +12,7 @@
 #include <time.h>
 #include <sys/time.h>
 #include <sys/fcntl.h>
+#include <ctype.h>
 
 #define HOST "192.168.4.91"
 #define PORT 8888
@@ -92,8 +93,32 @@ int main(int argc, char **argv)
     struct hostent *hp;
     unsigned int length;
     struct server *serv;
+    int c;
+    int t = 1; // Number of nanoseconds to sleep
+    int N = 1; // Number of message sending every t ns
+    int client_id = 81; // Client id
 
     serv = malloc(sizeof(struct server));
+
+    while  ((c = getopt (argc, argv, "n:t:c:")) != -1) {
+        switch(c)
+        {
+            case 'n':
+                N = atoi(optarg);
+                break;
+
+            case 't':
+                t = atoi(optarg);
+                break;
+
+            case 'c':
+                client_id = atoi(optarg);
+                break;
+
+            default:
+                error("missing arguments");
+        }
+    }
     /* Create socket */
     int sock;
     sock = socket(AF_INET, SOCK_DGRAM, 0);
@@ -131,15 +156,11 @@ int main(int argc, char **argv)
     struct timespec tsp;
     struct timespec req = {0};
     req.tv_sec = 0;
-    req.tv_nsec = 1;
+    req.tv_nsec = t;
 
     int total = 0;
     int count = 0;
-    int client_id = 81;
     char msgid[28];
-    int N = atoi(argv[1]);
-
-
 
     memset(buffer, '@', MAX);
 
