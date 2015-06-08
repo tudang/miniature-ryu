@@ -91,7 +91,7 @@ int main(int argc, char *argv[])
             //printf("send_tbl[%d]:%lld.%.9ld\n", count, (long long) send_tbl[count].tv_sec, send_tbl[count].tv_nsec);
             count++;
             strncpy(buffer, msgid, 28);
-            int activity = select(sock+1, NULL, &writefds, NULL, NULL);
+            int activity = select(sock+1, &read_fds, &writefds, NULL, NULL);
             if (activity) {
                 if (FD_ISSET(sock, &writefds)) {
                     n = sendto(sock, buffer, strlen(buffer), 0, 
