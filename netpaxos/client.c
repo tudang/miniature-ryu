@@ -1,4 +1,5 @@
 /* UDP client in the internet domain */
+#include <pthread.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -11,9 +12,12 @@
 #include <time.h>
 #include <sys/time.h>
 #include <sys/fcntl.h>
+#include <ctype.h>
 
+#define HOST "192.168.4.91"
+#define PORT 8888
 #define MAX 1470
-#define NPACKET 500000
+#define NPACKET 500001
 #define BILLION 1000000000L
 
 void error(const char *msg)
@@ -22,116 +26,175 @@ void error(const char *msg)
     exit(1);
 }
 
-int main(int argc, char *argv[])
-{
-    int sock, n, i, j;
+struct server {
+    int socket;
+    struct sockaddr_in server;
     unsigned int length;
-    struct sockaddr_in server, from;
-    struct hostent *hp;
-    char buffer[MAX];
-    char recvline[MAX];
-    struct timeval tstart={0,0}, tend={0,0}, res;
-    fd_set writefds, read_fds;
-    struct timespec send_tbl[NPACKET] = {1,1};
-    
+};
+
+struct timespec send_tbl[NPACKET] = {1,1};
+
+void *sendMsg(void *arg)
+{
+
+
+    return NULL;
+}
+
+void *recvMsg(void *arg)
+{
+    fd_set read_fd_set;
+    struct server *s = (struct server*) arg;
+    int sock = s->socket;
+    char recvbuf[MAX];
+    struct timeval timeout = {30, 0};
     char last_msg[6];
-    char sec[10];
-    char nsec[9];
-    int last_id = 0;
+    int last_id;
     long long int total_latency = 0;
+    int count = 0;
 
-    if (argc != 5) { printf("Usage: server port N\n");
-                        exit(1);
+    FD_ZERO(&read_fd_set);
+    FD_SET(sock, &read_fd_set);
+
+    while(1) {
+        int activity = select(sock+1, &read_fd_set, NULL, NULL, NULL);
+        if (activity) {
+            if(FD_ISSET(sock, &read_fd_set)) {
+                int n = recvfrom(sock, recvbuf, MAX, 0, NULL, NULL);
+                if (n < 0) error("recvfrom");
+                strncpy(last_msg, recvbuf+2, 6);
+                last_id = atoi(last_msg);
+                struct timespec end;
+                clock_gettime(CLOCK_REALTIME, &end);
+                uint64_t diff = BILLION * (end.tv_sec - send_tbl[last_id].tv_sec) +
+                                    end.tv_nsec - send_tbl[last_id].tv_nsec;
+                total_latency += (diff / 2000);
+                count++;
+                // printf("recv %d bytes: %s\n", n, recvbuf);
+            }
+        } 
+        
+        if ((count%100000) == 0)
+        {
+            printf("Avg. Latency: %ld / %d = %3.2f\n", total_latency, count,
+            ((float) total_latency / count));
+        }
+        
     }
-    int client_id = atoi(argv[4]);
-    sock = socket(AF_INET, SOCK_DGRAM, 0);
-    if (sock <0) error("socket");
 
+
+    return NULL;
+}
+
+int main(int argc, char **argv) 
+{
+    pthread_t sth, rth; // thread identifier
+    struct sockaddr_in server_addr;
+    struct hostent *hp;
+    unsigned int length;
+    struct server *serv;
+    int c;
+    int t = 1; // Number of nanoseconds to sleep
+    int N = 1; // Number of message sending every t ns
+    int client_id = 81; // Client id
+
+    serv = malloc(sizeof(struct server));
+
+    while  ((c = getopt (argc, argv, "n:t:c:")) != -1) {
+        switch(c)
+        {
+            case 'n':
+                N = atoi(optarg);
+                break;
+
+            case 't':
+                t = atoi(optarg);
+                break;
+
+            case 'c':
+                client_id = atoi(optarg);
+                break;
+
+            default:
+                error("missing arguments");
+        }
+    }
+    /* Create socket */
+    int sock;
+    sock = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sock < 0) error("socket");
+    
     if (fcntl(sock, F_SETFL, O_NONBLOCK) < 0)
     {
         perror("fcntl error");
         exit(1);
     }
-
-    server.sin_family = AF_INET;
-    hp = gethostbyname(argv[1]);
+    
+    
+    server_addr.sin_family = AF_INET;
+    hp = gethostbyname(HOST);
     if (hp == NULL) error("Uknown host");
 
     bcopy((char *)hp->h_addr,
-         (char *)&server.sin_addr,
+         (char *)&server_addr.sin_addr,
          hp->h_length);
-    server.sin_port = htons(atoi(argv[2]));
+    server_addr.sin_port = htons(PORT);
     length = sizeof(struct sockaddr_in);
 
-    FD_ZERO(&writefds);
+    (*serv).socket = sock;
+    (*serv).server = server_addr;
+    (*serv).length = length;
 
-    FD_SET(sock, &writefds);
-    FD_SET(sock, &read_fds);
 
+    /* Create worker thread */
+    pthread_create(&rth, NULL, recvMsg, (void*) serv);
+
+    /* Sending in Main thread */
+    fd_set write_fd_set;
+    char buffer[MAX];
+
+    struct timespec tsp;
     struct timespec req = {0};
-    struct timespec tsp = {0,0};
-    int micro = 700;
     req.tv_sec = 0;
-    req.tv_nsec = micro * 1.0e3;
-    long total = 0;
-    gettimeofday(&tstart, NULL);
-    int N = atoi(argv[3]);
-    char* msgid; 
-    msgid = (char *) malloc(8);
+    req.tv_nsec = t;
+
+    int total = 0;
     int count = 0;
-    int previous = -1;
-    for(i=0; i < (NPACKET / N); i++) {
-        for(j=0; j < N; j++) {
-            memset(buffer, '@', MAX);
-            clock_gettime(CLOCK_REALTIME, &tsp);
-            //printf("%lld.%.9ld\n", (long long)tsp.tv_sec, tsp.tv_nsec);
-            sprintf(msgid, "%2d%06d%lld.%.9ld", client_id, count, 
-                                 (long long) tsp.tv_sec, tsp.tv_nsec);
-            send_tbl[count] = tsp;
-            //printf("send_tbl[%d]:%lld.%.9ld\n", count, (long long) send_tbl[count].tv_sec, send_tbl[count].tv_nsec);
-            count++;
-            strncpy(buffer, msgid, 28);
-            int activity = select(sock+1, &read_fds, &writefds, NULL, NULL);
-            if (activity) {
-                if (FD_ISSET(sock, &writefds)) {
-                    n = sendto(sock, buffer, strlen(buffer), 0, 
-                            (struct sockaddr *)&server, length);
-                    if (n < 0) error("sendto");
-                    total += n;
-                }
-                if (FD_ISSET(sock, &read_fds)) {
-                    n = recvfrom(sock,recvline,MAX,0,NULL,NULL);
-                    //printf("%s\n", recvline);
-                    strncpy(last_msg, recvline+2, 6);
-                    //strncpy(sec, recvline+8, 11);
-                    //strncpy(nsec, recvline+20, 9);
-                    //printf("%s %s %s\n", last_msg, sec, nsec);
-                    last_id = atoi(last_msg);
-                    if (last_id == previous) continue;
-                    previous = last_id;
-                    //printf("last_id:%d\n", last_id);
-                    struct timespec end;
-                    clock_gettime(CLOCK_REALTIME, &end);
-                    //printf("End:%lld.%.9ld\n", (long long) end.tv_sec, end.tv_nsec);
-                    //printf("Srt:%lld.%.9ld\n", (long long) send_tbl[last_id].tv_sec, send_tbl[last_id].tv_nsec);
-                    uint64_t diff = BILLION * (end.tv_sec - send_tbl[last_id].tv_sec) +
-                                    end.tv_nsec - send_tbl[last_id].tv_nsec;
-                    //printf("%6d\t%llu us\n", last_id, (long long unsigned int) diff / 2000);
-                    total_latency += (diff / 2000);
-                }
+    char msgid[28];
+
+    memset(buffer, '@', MAX);
+
+    FD_ZERO(&write_fd_set);
+    FD_SET(sock, &write_fd_set);
+
+    while (count < NPACKET) {
+        int activity = select(sock+1, NULL, &write_fd_set, NULL, NULL);
+        if (activity) {
+            if (FD_ISSET(sock, &write_fd_set)) {
+                // get timestamp and attach to message
+                clock_gettime(CLOCK_REALTIME, &tsp);
+                sprintf(msgid, "%2d%06d%lld.%.9ld", client_id, count,
+                        (long long) tsp.tv_sec, tsp.tv_nsec);
+                strncpy(buffer, msgid, 28);
+                // put (value,timestamp)
+                send_tbl[count] = tsp;
+                int n = sendto(sock, buffer, strlen(buffer), 0, 
+                            (struct sockaddr *)&server_addr, length);
+                if (n < 0) error("sendto");
+                total += n;
+                //printf("send %d bytes: [%s]\n", n, msgid);
             }
         }
-        nanosleep(&req, (struct timespec *)NULL);
+        count++;
+
+        if ((count % N) == 0) 
+            nanosleep(&req, (struct timespec *)NULL);
     }
-    gettimeofday(&tend, NULL);
-    timersub(&tend, &tstart, &res);
-    double duration = res.tv_sec + res.tv_usec*1.0e-6;
-    printf("Duration: %.6f\n", duration);
-    printf("Throughput: %.2f\n", ((double)total * 8 / duration * 1.0e-6));
-    printf("Packet/second: %.0f\n", ((double)count) / duration );
-    printf("Number of sent msg: %d\n", count);
-    printf("Avg. Latency: %3.2f\n", ((float) total_latency / count));
-    
-    close(sock);
+    /* wait for our thread to finish before continuing */
+    sleep(5);
+    pthread_cancel(rth);
+
+    printf("Main exit.\n"); 
+
     return 0;
 }
