@@ -20,12 +20,6 @@
 #define NPACKET 500001
 #define BILLION 1000000000L
 
-void error(const char *msg)
-{
-    perror(msg);
-    exit(1);
-}
-
 struct server {
     int socket;
     struct sockaddr_in server;
@@ -34,12 +28,18 @@ struct server {
 
 struct timespec send_tbl[NPACKET] = {1,1};
 
-void *sendMsg(void *arg)
+void error(const char *msg)
 {
-
-
-    return NULL;
+    perror(msg);
+    exit(1);
 }
+
+uint64_t timediff(struct timespec start, struct timespec end)
+{
+    return (BILLION * (end.tv_sec - start.tv_sec) +
+                    end.tv_nsec - start.tv_nsec);
+}
+
 
 void *recvMsg(void *arg)
 {
@@ -66,8 +66,7 @@ void *recvMsg(void *arg)
                 last_id = atoi(last_msg);
                 struct timespec end;
                 clock_gettime(CLOCK_REALTIME, &end);
-                uint64_t diff = BILLION * (end.tv_sec - send_tbl[last_id].tv_sec) +
-                                    end.tv_nsec - send_tbl[last_id].tv_nsec;
+                uint64_t diff = timediff(send_tbl[last_id], end);
                 total_latency += (diff / 2000);
                 count++;
                 // printf("recv %d bytes: %s\n", n, recvbuf);
@@ -76,7 +75,7 @@ void *recvMsg(void *arg)
         
         if ((count%100000) == 0)
         {
-            printf("Avg. Latency: %ld / %d = %3.2f\n", total_latency, count,
+            printf("Avg. Latency: %ld / %d = %3.2f us\n", total_latency, count,
             ((float) total_latency / count));
         }
         
@@ -153,7 +152,7 @@ int main(int argc, char **argv)
     fd_set write_fd_set;
     char buffer[MAX];
 
-    struct timespec tsp;
+    struct timespec tsp, tstart, tend;
     struct timespec req = {0};
     req.tv_sec = 0;
     req.tv_nsec = t;
@@ -166,6 +165,9 @@ int main(int argc, char **argv)
 
     FD_ZERO(&write_fd_set);
     FD_SET(sock, &write_fd_set);
+
+    // get time start sending
+    clock_gettime(CLOCK_REALTIME, &tstart);
 
     while (count < NPACKET) {
         int activity = select(sock+1, NULL, &write_fd_set, NULL, NULL);
@@ -190,6 +192,12 @@ int main(int argc, char **argv)
         if ((count % N) == 0) 
             nanosleep(&req, (struct timespec *)NULL);
     }
+    // get time end sending
+    clock_gettime(CLOCK_REALTIME, &tend);
+    float duration = timediff(tstart, tend) / BILLION;
+
+    printf("packets/second: %3.2f\n", (float) count / duration);
+    printf("Total packets/second: %3.2f\n", ((float) count / duration) * 2);
     /* wait for our thread to finish before continuing */
     sleep(5);
     pthread_cancel(rth);
