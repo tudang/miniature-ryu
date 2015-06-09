@@ -178,7 +178,6 @@ void *evalFunc(void *args)
         learn[k++] = selected;
         fprintf(out, "%d\n", selected);
         // aggregate latency
-        avg_ltc += ltc[i];
         if ((i%100000) == 0) {
             clock_gettime(CLOCK_REALTIME, &tend);
             uint64_t res = BILLION * (tend.tv_sec - tstart.tv_sec) + tend.tv_nsec - tstart.tv_nsec;
@@ -187,7 +186,6 @@ void *evalFunc(void *args)
             printf("Packet/second: %0.f\n", ((double) counter / duration));
             printf("Ratio of undicided req: %.5f\n",
                                     (double)undecided_counter / counter);
-            printf("avg_latency: %.2f us\n", 1.0e-3*avg_ltc/((double)i+1));
             fflush(out);
         }
         // Next instance
