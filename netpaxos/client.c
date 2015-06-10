@@ -14,8 +14,8 @@
 #include <sys/fcntl.h>
 #include <ctype.h>
 
-#define HOST "192.168.4.91"
-#define PORT 8888
+#define GROUP "239.0.0.1"
+#define PORT 6000
 #define MAX 1470
 #define NPACKET 500001
 #define BILLION 1000000000L
@@ -88,7 +88,8 @@ void *recvMsg(void *arg)
 int main(int argc, char **argv) 
 {
     pthread_t sth, rth; // thread identifier
-    struct sockaddr_in server_addr;
+    struct sockaddr_in server;
+    struct ip_mreq mreq;
     struct hostent *hp;
     unsigned int length;
     struct server *serv;
@@ -130,18 +131,13 @@ int main(int argc, char **argv)
     }
     
     
-    server_addr.sin_family = AF_INET;
-    hp = gethostbyname(HOST);
-    if (hp == NULL) error("Uknown host");
-
-    bcopy((char *)hp->h_addr,
-         (char *)&server_addr.sin_addr,
-         hp->h_length);
-    server_addr.sin_port = htons(PORT);
+    server.sin_family = AF_INET;
+    server.sin_addr.s_addr = htonl(INADDR_ANY);
+    server.sin_port = htons(PORT);
     length = sizeof(struct sockaddr_in);
 
     (*serv).socket = sock;
-    (*serv).server = server_addr;
+    (*serv).server = server;
     (*serv).length = length;
 
 
@@ -149,6 +145,7 @@ int main(int argc, char **argv)
     pthread_create(&rth, NULL, recvMsg, (void*) serv);
 
     /* Sending in Main thread */
+    server.sin_addr.s_addr = inet_addr(GROUP);
     fd_set write_fd_set;
     char buffer[MAX];
 
@@ -181,7 +178,7 @@ int main(int argc, char **argv)
                 // put (value,timestamp)
                 send_tbl[count] = tsp;
                 int n = sendto(sock, buffer, strlen(buffer), 0, 
-                            (struct sockaddr *)&server_addr, length);
+                            (struct sockaddr *)&server, length);
                 if (n < 0) error("sendto");
                 total += n;
                 //printf("send %d bytes: [%s]\n", n, msgid);
