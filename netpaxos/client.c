@@ -13,9 +13,11 @@
 #include <sys/time.h>
 #include <sys/fcntl.h>
 #include <ctype.h>
+#include <net/if.h>
+#include <sys/ioctl.h>
 
 #define GROUP "239.0.0.1"
-#define PORT 6000
+#define PORT 8888
 #define MAX 1470
 #define NPACKET 500001
 #define BILLION 1000000000L
@@ -85,22 +87,27 @@ void *recvMsg(void *arg)
     return NULL;
 }
 
+
+void my_ip( char *myniccard, char *myipaddr) {
+}   
+
 int main(int argc, char **argv) 
 {
     pthread_t sth, rth; // thread identifier
-    struct sockaddr_in server;
+    struct sockaddr_in local, server;
     struct ip_mreq mreq;
-    struct hostent *hp;
+    struct hostent *he;
     unsigned int length;
     struct server *serv;
     int c;
     int t = 1; // Number of nanoseconds to sleep
     int N = 1; // Number of message sending every t ns
     int client_id = 81; // Client id
+    char *myniccard;
 
     serv = malloc(sizeof(struct server));
 
-    while  ((c = getopt (argc, argv, "n:t:c:")) != -1) {
+    while  ((c = getopt (argc, argv, "n:t:c:a:")) != -1) {
         switch(c)
         {
             case 'n':
@@ -114,11 +121,33 @@ int main(int argc, char **argv)
             case 'c':
                 client_id = atoi(optarg);
                 break;
+            
+            case 'a':
+                myniccard = optarg;
+                break;
 
             default:
                 error("missing arguments");
         }
     }
+    
+    int fd;
+    struct ifreq ifr;
+
+    fd = socket(AF_INET, SOCK_DGRAM, 0);
+
+    /* I want to get an IPv4 IP address */
+      ifr.ifr_addr.sa_family = AF_INET;
+
+      /* I want IP address attached to "eth0" */
+    strncpy(ifr.ifr_name, myniccard, IFNAMSIZ-1);
+    ioctl(fd, SIOCGIFADDR, &ifr);
+    close(fd);
+    /* display result */
+    char *itf_addr = 
+     inet_ntoa(((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr);
+    printf("MY IP address:%s: on port: %d\n", itf_addr, PORT);
+    
     /* Create socket */
     int sock;
     sock = socket(AF_INET, SOCK_DGRAM, 0);
@@ -130,9 +159,13 @@ int main(int argc, char **argv)
         exit(1);
     }
     
+    local.sin_family = AF_INET;
+    local.sin_addr.s_addr = inet_addr(itf_addr);
+    local.sin_port = htons(PORT);
+    bind(sock, (struct sockaddr *)&local, sizeof(local));
     
     server.sin_family = AF_INET;
-    server.sin_addr.s_addr = htonl(INADDR_ANY);
+    server.sin_addr.s_addr = inet_addr(GROUP);
     server.sin_port = htons(PORT);
     length = sizeof(struct sockaddr_in);
 
@@ -145,7 +178,6 @@ int main(int argc, char **argv)
     pthread_create(&rth, NULL, recvMsg, (void*) serv);
 
     /* Sending in Main thread */
-    server.sin_addr.s_addr = inet_addr(GROUP);
     fd_set write_fd_set;
     char buffer[MAX];
 

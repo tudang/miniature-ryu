@@ -1,3 +1,6 @@
+test:	test.o
+	gcc -o test -lrt -lpthread test.c
+
 client:	client.o
 	gcc -o client -lrt -lpthread client.c
 
