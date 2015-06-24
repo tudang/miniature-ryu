@@ -7,6 +7,9 @@ client:	client.o
 server: server.o
 	gcc -o server -lrt -lpthread server.c
 
+single: single.o
+	gcc -o single -lrt -lpthread single.c
+
 storage: storage.o
 	gcc -o storage -lrt storage.c
 
