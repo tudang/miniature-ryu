@@ -13,5 +13,7 @@ single: single.o
 storage: storage.o
 	gcc -o storage -lrt storage.c
 
+validate: validate.o
+	gcc -o validate validate.c
 clean:
 	rm -f *.o client server storage
