@@ -18,7 +18,7 @@
 #define GROUP "239.0.0.1"
 #define PORT 8888
 #define SIZE 1470
-#define MAX_NUM 1000
+#define MAX_NUM 1000000
 #define BILLION 1000000000L
 
 
