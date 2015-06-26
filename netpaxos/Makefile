@@ -1,14 +1,16 @@
+all: test sender server receiver storage validate
+
 test:	test.o
 	gcc -o test -lrt -lpthread test.c
 
-client:	client.o
-	gcc -o client -lrt -lpthread client.c
+sender:	sender.o
+	gcc -o sender -lrt -lpthread sender.c
 
 server: server.o
 	gcc -o server -lrt -lpthread server.c
 
-single: single.o
-	gcc -o single -lrt -lpthread single.c
+receiver: receiver.o
+	gcc -o receiver -lrt -lpthread receiver.c
 
 storage: storage.o
 	gcc -o storage -lrt storage.c
@@ -16,4 +18,4 @@ storage: storage.o
 validate: validate.o
 	gcc -o validate validate.c
 clean:
-	rm -f *.o client server storage
+	rm -f *.o sender server storage receiver test validate

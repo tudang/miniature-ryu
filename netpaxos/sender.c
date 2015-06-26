@@ -226,7 +226,6 @@ int main(int argc, char **argv)
     float duration = timediff(tstart, tend) / BILLION;
 
     printf("packets/second: %3.2f\n", (float) count / duration);
-    printf("Total packets/second: %3.2f\n", ((float) count / duration) * 2);
     /* wait for our thread to finish before continuing */
     sleep(5);
     pthread_cancel(rth);

@@ -18,7 +18,7 @@
 #define GROUP "239.0.0.1"
 #define PORT 8888
 #define SIZE 1470
-#define MAX_NUM 1000000
+#define MAX_NUM 500000
 #define BILLION 1000000000L
 
 
@@ -126,7 +126,6 @@ void *recvFunc(void *arg)
 int main(int argc, char**argv)
 {
     int i, err;
-    int count = 0;
     int *ptr[argc-1];
     pthread_t tid[argc-1]; // this is thread identifier
 
@@ -136,8 +135,8 @@ int main(int argc, char**argv)
         exit(1);
     }
 
-    for(i = 1; i < argc; i++) {
-        err = pthread_create(&tid[count++], NULL, recvFunc, argv[i]);
+    for(i = 0; i < argc-1; i++) {
+        err = pthread_create(&tid[i], NULL, recvFunc, argv[i+1]);
         if (err != 0) {
             perror("Thread create Error");
             exit(1);
@@ -145,8 +144,9 @@ int main(int argc, char**argv)
     }
 
 
-    for(i = 0; i < argc; i++) {
-       pthread_join(tid[i], (void**)&(ptr[i])); 
+    for(i = 0; i < argc-1; i++) {
+        printf("wait thread %d\n", i);
+       pthread_join(tid[i], NULL); 
     }
 
     return 0;
