@@ -16,6 +16,6 @@ storage: storage.o
 	gcc -o storage -lrt storage.c
 
 validate: validate.o
-	gcc -o validate validate.c
+	gcc -o validate validate.c list.c
 clean:
 	rm -f *.o sender server storage receiver test validate
