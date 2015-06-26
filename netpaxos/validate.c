@@ -129,12 +129,19 @@ int remove_by_index(node_t ** head, int n) {
 
 int main(int argc, char *argv[]) {
 
-    FILE *file = fopen(argv[1], "r");
-    if (file == NULL) {
-        perror("Opening file");
-        exit(1);
+    FILE *file; 
+
+    if (argc > 1) {
+        file = fopen(argv[1], "r");
+        if (file == NULL) {
+            perror("Opening file");
+            exit(1);
+        }
     }
+    else
+        file = stdin;
     
+
     int reorder = 0;
     int lost = 0;
 
@@ -152,7 +159,6 @@ int main(int argc, char *argv[]) {
         strncpy(str_number, line+2, 6);
         int value = atoi(str_number);
         //printf("sequence:%d\tvalue:%d\n", sequence, value);
-        if (value ==0) sequence = 0; //reset
         if (sequence == value) {
             sequence++;
             continue;
@@ -171,16 +177,16 @@ int main(int argc, char *argv[]) {
                 sequence++;
             }
             sequence++; /* next value */
-            print_list(head);
+            //print_list(head);
             printf("----\n");
         }
     }
 
-    print_list(head);
+    //print_list(head);
     lost = count_list(head) - 1; // Do not count head value
     
     printf("Lost:%d\tReodered:%d\n", lost, reorder);
 
-    fclose(file);
+    //fclose(file);
     return 0;
 }
