@@ -15,12 +15,16 @@
 #include <ctype.h>
 #include <net/if.h>
 #include <sys/ioctl.h>
+#include <limits.h>
 
 #define GROUP "239.0.0.1"
 #define PORT 8888
 #define MAX 1470
-#define NPACKET 500001
 #define BILLION 1000000000L
+
+void error(const char *msg);
+void *recvMsg(void *arg);
+uint64_t timediff(struct timespec start, struct timespec end);
 
 struct server {
     int socket;
@@ -88,9 +92,6 @@ void *recvMsg(void *arg)
 }
 
 
-void my_ip( char *myniccard, char *myipaddr) {
-}   
-
 int main(int argc, char **argv) 
 {
     pthread_t sth, rth; // thread identifier
@@ -102,16 +103,21 @@ int main(int argc, char **argv)
     int c;
     int t = 1; // Number of nanoseconds to sleep
     int N = 1; // Number of message sending every t ns
+    int MAX_VALUE = 500000; // MAX sequence number
     int client_id = 81; // Client id
     char *myniccard;
 
     serv = malloc(sizeof(struct server));
 
-    while  ((c = getopt (argc, argv, "n:t:c:a:")) != -1) {
+    while  ((c = getopt (argc, argv, "n:t:c:i:M:")) != -1) {
         switch(c)
         {
             case 'n':
                 N = atoi(optarg);
+                break;
+
+            case 'M':
+                MAX_VALUE = atoi(optarg);
                 break;
 
             case 't':
@@ -122,12 +128,12 @@ int main(int argc, char **argv)
                 client_id = atoi(optarg);
                 break;
             
-            case 'a':
+            case 'i':
                 myniccard = optarg;
                 break;
 
             default:
-                error("missing arguments");
+                exit(1);
         }
     }
     
@@ -154,10 +160,8 @@ int main(int argc, char **argv)
     if (sock < 0) error("socket");
     
     if (fcntl(sock, F_SETFL, O_NONBLOCK) < 0)
-    {
-        perror("fcntl error");
-        exit(1);
-    }
+        error("fcntl error");
+    
     
     local.sin_family = AF_INET;
     local.sin_addr.s_addr = inet_addr(itf_addr);
@@ -198,13 +202,13 @@ int main(int argc, char **argv)
     // get time start sending
     clock_gettime(CLOCK_REALTIME, &tstart);
 
-    while (count < NPACKET) {
+    while (count < MAX_VALUE) {
         int activity = select(sock+1, NULL, &write_fd_set, NULL, NULL);
         if (activity) {
             if (FD_ISSET(sock, &write_fd_set)) {
                 // get timestamp and attach to message
                 clock_gettime(CLOCK_REALTIME, &tsp);
-                sprintf(msgid, "%2d%06d%lld.%.9ld", client_id, count,
+                sprintf(msgid, "%2d%06d%lld.%.9ld", client_id, count+1,
                         (long long) tsp.tv_sec, tsp.tv_nsec);
                 strncpy(buffer, msgid, 28);
                 // put (value,timestamp)
@@ -218,13 +222,13 @@ int main(int argc, char **argv)
         }
         count++;
 
+
         if ((count % N) == 0) 
             nanosleep(&req, (struct timespec *)NULL);
     }
     // get time end sending
     clock_gettime(CLOCK_REALTIME, &tend);
     float duration = timediff(tstart, tend) / BILLION;
-
     printf("packets/second: %3.2f\n", (float) count / duration);
     /* wait for our thread to finish before continuing */
     sleep(5);

@@ -14,13 +14,46 @@
 #include <sys/ioctl.h>
 #include <net/if.h>
 #include <arpa/inet.h>
+#include <limits.h>
 
 #define GROUP "239.0.0.1"
 #define PORT 8888
 #define SIZE 1470
-#define MAX_NUM 500000
 #define BILLION 1000000000L
+#define INST_MAX 1000000
 
+uint64_t timediff(struct timespec start, struct timespec end);
+void *recvFunc(void *arg);
+
+
+int main(int argc, char**argv)
+{
+    int i, err;
+    int *ptr[argc-1];
+    pthread_t tid[argc-1]; // this is thread identifier
+
+
+    if (argc < 2) { 
+        printf("Usage: ./server [eth*]\n"); 
+        exit(1);
+    }
+
+    for(i = 0; i < argc-1; i++) {
+        err = pthread_create(&tid[i], NULL, recvFunc, argv[i+1]);
+        if (err != 0) {
+            perror("Thread create Error");
+            exit(1);
+        }
+    }
+
+
+    for(i = 0; i < argc-1; i++) {
+        printf("wait thread %d\n", i);
+       pthread_join(tid[i], NULL); 
+    }
+
+    return 0;
+}
 
 uint64_t timediff(struct timespec start, struct timespec end)
 {
@@ -41,8 +74,8 @@ void *recvFunc(void *arg)
     pthread_t self_id;
     self_id = pthread_self();
     char last_msg[9];
-    int last_id = 0;
-    int inst = 0;
+    int last_id = 1;
+    int inst = 1;
 
     sockfd=socket(AF_INET,SOCK_DGRAM,0);
     if (sockfd < 0) {
@@ -108,7 +141,7 @@ void *recvFunc(void *arg)
     n = sendto(sockfd,last_msg,strlen(last_msg),0,(struct sockaddr *)&cliaddr,len);
 
     // Subsequent messages
-    while (inst < MAX_NUM)
+    while (inst < INST_MAX - 1)
     {
         n=recvfrom(sockfd,mesg,SIZE,0,(struct sockaddr *)&cliaddr,&len);
         strncpy(last_msg, mesg, 8);
@@ -121,33 +154,4 @@ void *recvFunc(void *arg)
     fclose(out);
     pthread_exit(&last_id);
     return NULL;
-}
-
-int main(int argc, char**argv)
-{
-    int i, err;
-    int *ptr[argc-1];
-    pthread_t tid[argc-1]; // this is thread identifier
-
-
-    if (argc < 2) { 
-        printf("Usage: ./server [eth*]\n"); 
-        exit(1);
-    }
-
-    for(i = 0; i < argc-1; i++) {
-        err = pthread_create(&tid[i], NULL, recvFunc, argv[i+1]);
-        if (err != 0) {
-            perror("Thread create Error");
-            exit(1);
-        }
-    }
-
-
-    for(i = 0; i < argc-1; i++) {
-        printf("wait thread %d\n", i);
-       pthread_join(tid[i], NULL); 
-    }
-
-    return 0;
 }
