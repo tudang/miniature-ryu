@@ -1,0 +1,5 @@
+# Start server1 on node91
+sudo ./server eth0 eth1 eth2 eth3 server1.txt
+
+# Run sender on node90 using eth0 N packet / ns. 
+./sender -i eth0 -n 1 -t 1

@@ -18,7 +18,7 @@
 #define GROUP "239.0.0.1"
 #define PORT 8888
 #define SIZE 1470
-#define MAX_NUM 1000000 + 1
+#define MAX_NUM 500000 + 1
 #define BILLION 1000000000L
 
 pthread_t tid[4]; // this is thread identifier
@@ -182,7 +182,7 @@ void *evalFunc(void *args)
                         //printf("Thread blocked: interface %d\n", j);
                         //printf("Wait timed out!\n");
                         an_instance[j] = -1;
-                        printf("%.8s ", "");
+                        printf("%.8s ");
                         break;
                     }
                     else     
@@ -279,7 +279,7 @@ int main(int argc, char**argv)
        pthread_join(tid[i], (void**)&(ptr[i])); 
     }
 
-    sleep(2);
+    sleep(5);
     
     cont = 0;
  

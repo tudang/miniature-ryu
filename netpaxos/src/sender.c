@@ -19,6 +19,7 @@
 
 #define GROUP "239.0.0.1"
 #define PORT 8888
+#define MAX_VALUE  1000000 // MAX sequence number
 #define MAX 1470
 #define BILLION 1000000000L
 
@@ -32,7 +33,7 @@ struct server {
     unsigned int length;
 };
 
-struct timespec send_tbl[NPACKET] = {1,1};
+struct timespec send_tbl[MAX_VALUE] = {1,1};
 
 void error(const char *msg)
 {
@@ -103,21 +104,16 @@ int main(int argc, char **argv)
     int c;
     int t = 1; // Number of nanoseconds to sleep
     int N = 1; // Number of message sending every t ns
-    int MAX_VALUE = 500000; // MAX sequence number
     int client_id = 81; // Client id
     char *myniccard;
 
     serv = malloc(sizeof(struct server));
 
-    while  ((c = getopt (argc, argv, "n:t:c:i:M:")) != -1) {
+    while  ((c = getopt (argc, argv, "n:t:c:i:")) != -1) {
         switch(c)
         {
             case 'n':
                 N = atoi(optarg);
-                break;
-
-            case 'M':
-                MAX_VALUE = atoi(optarg);
                 break;
 
             case 't':

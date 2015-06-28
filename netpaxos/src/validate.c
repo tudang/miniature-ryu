@@ -35,7 +35,7 @@ int check_order(FILE *file) {
 
     char line[SIZE];
     char str_number[6];
-    int sequence = 0;
+    int sequence = 1;
     node_t *head = NULL;
     head = malloc(sizeof(node_t));
     if (head == NULL) {
@@ -71,7 +71,7 @@ int check_order(FILE *file) {
         }
     }
 
-    //print_list(head);
+    print_list(head);
     lost = count_list(head) - 1; // Do not count head value
     
     printf("Lost:%d\tReodered:%d\tCount:%d\n", lost, reorder, count);
