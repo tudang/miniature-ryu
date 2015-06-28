@@ -11,11 +11,14 @@
 #include <fcntl.h>
 #include <pthread.h>
 #include <errno.h>
+#include <sys/ioctl.h>
+#include <net/if.h>
 
 
+#define GROUP "239.0.0.1"
 #define PORT 8888
 #define SIZE 1470
-#define MAX_NUM 1000000 + 1
+#define MAX_NUM 500000 + 1
 #define BILLION 1000000000L
 
 pthread_t tid[4]; // this is thread identifier
@@ -60,6 +63,11 @@ void *recvFunc(void *arg)
     int last_id = 0;
     int inst = 0;
     sockfd=socket(AF_INET,SOCK_DGRAM,0);
+    if (sockfd < 0) {
+        error("ERROR opening socket");
+        exit(1);
+    }
+
     if (setsockopt(sockfd, SOL_SOCKET, SO_BINDTODEVICE, 
                             itf, strlen(itf)) < 0) 
     {
@@ -72,9 +80,36 @@ void *recvFunc(void *arg)
     servaddr.sin_family = AF_INET;
     servaddr.sin_addr.s_addr=htonl(INADDR_ANY);
     servaddr.sin_port=htons(PORT);
-    bind(sockfd,(struct sockaddr *)&servaddr,sizeof(servaddr));
+
+
+    struct ifreq ifr;
+    ifr.ifr_addr.sa_family = AF_INET;
+    strncpy(ifr.ifr_name, itf, IFNAMSIZ-1);
+    ioctl(sockfd, SIOCGIFADDR, &ifr);
+    struct in_addr sin = ((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr;
+    char itf_addr[INET_ADDRSTRLEN]; 
+    if (inet_ntop(AF_INET, &sin, itf_addr, sizeof(itf_addr)))
+        {
+        //printf("%s\n", itf_addr);
+        }
+    else
+        perror("inet_ntop");
     
     
+    struct ip_mreq mreq;
+
+    mreq.imr_multiaddr.s_addr = inet_addr(GROUP);
+    mreq.imr_interface.s_addr = inet_addr(itf_addr);
+
+    if (setsockopt(sockfd, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) < 0) {
+        error("setsockopt mreq");
+        exit(1);
+    }
+    
+    if (bind(sockfd,(struct sockaddr *)&servaddr,sizeof(servaddr)) < 0) {
+        error("bind");
+        exit(1);
+    }
     char buf[SIZE];
     len = sizeof(cliaddr);
     // Receive the first message
@@ -95,7 +130,7 @@ void *recvFunc(void *arg)
         inst++;
         n = sendto(sockfd,last_msg,strlen(last_msg), 0, (struct sockaddr *)&cliaddr, len);
     }
-    printf("index:%d interface %s instance: %d\n", index, itf, inst);
+    //printf("index:%d interface %s instance: %d\n", index, itf, inst);
     pthread_exit(&last_id);
     return NULL;
 }
@@ -104,7 +139,7 @@ void *evalFunc(void *args)
 {
     int learn[MAX_NUM];
     while (start_receiving == 0) {sleep(1);}
-    printf("start eval\n");
+    //printf("start eval\n");
     struct timespec tstart={0,0}, tend={0,0}, res;
     clock_gettime(CLOCK_REALTIME, &tstart);
     int j, i = 0, k = 0;
@@ -117,7 +152,7 @@ void *evalFunc(void *args)
     char *tname;
     tname  = (char *)args;
     sprintf(filename, "/tmp/%s", tname);
-    printf("filename:%s\n", filename);
+    //printf("filename:%s\n", filename);
     out = fopen(filename ,"w");
 
     if (out == NULL) {
@@ -138,7 +173,7 @@ void *evalFunc(void *args)
         for (j = 0; j < 4; j++) {
             if (values[j][i] != 0)  {
                 an_instance[j] = values[j][i];
-                //printf("%.8d  ", values[j][i]);
+                printf("%.8d  ", values[j][i]);
             } 
             else  {
                 while (values[j][i] == 0)  {
@@ -147,21 +182,21 @@ void *evalFunc(void *args)
                         //printf("Thread blocked: interface %d\n", j);
                         //printf("Wait timed out!\n");
                         an_instance[j] = -1;
-                        //printf("%8s ", "");
+                        printf("%.8s ");
                         break;
                     }
                     else     
                     {
                         an_instance[j] = values[j][i];
-                        printf("Wait not timed out!\n");
+                        //printf("Wait not timed out!\n");
                     }
                 }
             }
         }
-        //printf("\n");
         int selected = findMajorityElement(an_instance, 4); 
         if (selected != -1) decided_counter++;
         else undecided_counter++;
+        printf("%.8d\n", selected);
        
         //printf("inst:%d chosen:%8d\n", i, selected);
         learn[k++] = selected;
@@ -172,8 +207,8 @@ void *evalFunc(void *args)
             uint64_t res = timediff(tstart, tend);
             double duration =  res*1.0e-9;
             //printf("Duration: %.6f\n", duration);
-            printf("pps: %0.f\t", ((double) (undecided_counter + decided_counter) / duration));
-            printf("indecision: %.5f\n",(double)undecided_counter / (undecided_counter + decided_counter));
+            //printf("pps: %0.f\t", ((double) (undecided_counter + decided_counter) / duration));
+            //printf("indecision: %.5f\n",(double)undecided_counter / (undecided_counter + decided_counter));
             fflush(out);
         }
         // Next instance
@@ -186,7 +221,7 @@ void *evalFunc(void *args)
        pthread_cancel(tid[thid]);
     }
     fclose(out);
-    printf("End Eval thread. instance:%d\n", i);
+    //printf("End Eval thread. instance:%d\n", i);
 }
 
 
@@ -244,12 +279,12 @@ int main(int argc, char**argv)
        pthread_join(tid[i], (void**)&(ptr[i])); 
     }
 
-    sleep(2);
+    sleep(5);
     
     cont = 0;
  
     pthread_join(eval_th, NULL);
 
-    printf("Main end\n");
+    //printf("Main end\n");
     //pthread_cancel(eval_th);
 }
