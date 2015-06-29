@@ -1,30 +1,6 @@
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <string.h>
-#include <strings.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <pthread.h>
-#include <stdbool.h>
-#include <sys/time.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <pthread.h>
-#include <errno.h>
-#include <sys/ioctl.h>
-#include <net/if.h>
-#include <arpa/inet.h>
-#include <limits.h>
+#include "value.h"
 
-#define GROUP "239.0.0.1"
-#define PORT 8888
-#define SIZE 1470
-#define BILLION 1000000000L
-#define INST_MAX 1000000
-
-uint64_t timediff(struct timespec start, struct timespec end);
 void *recvFunc(void *arg);
-
 
 int main(int argc, char**argv)
 {
@@ -55,12 +31,6 @@ int main(int argc, char**argv)
     return 0;
 }
 
-uint64_t timediff(struct timespec start, struct timespec end)
-{
-    return (BILLION * (end.tv_sec - start.tv_sec) +
-                    end.tv_nsec - start.tv_nsec);
-}
-
 
 /* This is thread function */
 void *recvFunc(void *arg)
@@ -68,7 +38,7 @@ void *recvFunc(void *arg)
     int sockfd, n;
     struct sockaddr_in servaddr, cliaddr;
     socklen_t len;
-    char mesg[SIZE];
+    char mesg[MAX];
     char *itf;
     itf = (char*)arg; 
     pthread_t self_id;
@@ -76,6 +46,7 @@ void *recvFunc(void *arg)
     char last_msg[9];
     int last_id = 1;
     int inst = 1;
+    value v; 
 
     sockfd=socket(AF_INET,SOCK_DGRAM,0);
     if (sockfd < 0) {
@@ -131,27 +102,21 @@ void *recvFunc(void *arg)
         exit(1);
     }
 
-    char buf[SIZE];
+    char buf[MAX];
     len = sizeof(cliaddr);
-    // Receive the first message
-    n = recvfrom(sockfd,mesg,SIZE,0,(struct sockaddr *)&cliaddr,&len);
-    strncpy(last_msg, mesg, 8);
-    last_id = atoi(last_msg);
-    fprintf(out, "%d\n", last_id);
-    n = sendto(sockfd,last_msg,strlen(last_msg),0,(struct sockaddr *)&cliaddr,len);
 
-    // Subsequent messages
-    while (inst < INST_MAX - 1)
-    {
-        n=recvfrom(sockfd,mesg,SIZE,0,(struct sockaddr *)&cliaddr,&len);
-        strncpy(last_msg, mesg, 8);
-        last_id = atoi(last_msg);
-        fprintf(out, "%d\n", last_id);
+    do {
+        n=recvfrom(sockfd,mesg,MAX,0,(struct sockaddr *)&cliaddr,&len);
+        deserialize_value(mesg, &v);
+        //printf("v.sequence:%d\n", v.sequence);
+        fprintf(out, "%d%d\n", v.client_id, v.sequence);
         inst++;
-        n=sendto(sockfd,last_msg,strlen(last_msg),0,(struct sockaddr *)&cliaddr,len);
-    }
+        int seq = htonl(v.sequence);
+        n=sendto(sockfd,&seq,sizeof(seq),0,(struct sockaddr *)&cliaddr,len);
+    } while (inst < MAX_SERVER - 1);
 
     fclose(out);
     pthread_exit(&last_id);
     return NULL;
 }
+

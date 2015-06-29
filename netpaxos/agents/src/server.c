@@ -1,29 +1,8 @@
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <string.h>
-#include <strings.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <pthread.h>
-#include <stdbool.h>
-#include <sys/time.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <pthread.h>
-#include <errno.h>
-#include <sys/ioctl.h>
-#include <net/if.h>
-
-
-#define GROUP "239.0.0.1"
-#define PORT 8888
-#define SIZE 1470
-#define MAX_NUM 500000 + 1
-#define BILLION 1000000000L
+#include "value.h"
 
 pthread_t tid[4]; // this is thread identifier
 
-int values[4][MAX_NUM];  // value queues
+int values[4][MAX_SERVER];  // value queues
 int start_receiving = 0;
 pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 int idx = 0;
@@ -38,19 +17,13 @@ struct thread_args {
     char *itf;
 };
 
-uint64_t timediff(struct timespec start, struct timespec end)
-{
-    return (BILLION * (end.tv_sec - start.tv_sec) +
-                    end.tv_nsec - start.tv_nsec);
-}
-
 /* This is thread function */
 void *recvFunc(void *arg)
 {
     int sockfd, n;
     struct sockaddr_in servaddr,cliaddr;
     socklen_t len;
-    char mesg[SIZE];
+    char mesg[MAX];
     char *itf;
     itf = (char*)arg; 
     pthread_mutex_lock(&lock);
@@ -59,8 +32,7 @@ void *recvFunc(void *arg)
     pthread_t self_id;
     self_id = pthread_self();
     //printf("index:%d interface %s\n", index, itf);
-    char last_msg[9];
-    int last_id = 0;
+    value v;
     int inst = 0;
     sockfd=socket(AF_INET,SOCK_DGRAM,0);
     if (sockfd < 0) {
@@ -110,34 +82,27 @@ void *recvFunc(void *arg)
         error("bind");
         exit(1);
     }
-    char buf[SIZE];
     len = sizeof(cliaddr);
-    // Receive the first message
-    n = recvfrom(sockfd,mesg,SIZE,0,(struct sockaddr *)&cliaddr,&len);
-    strncpy(last_msg, mesg, 8);
-    last_id = atoi(last_msg);
-    values[index][inst++] = last_id;  
-    n = sendto(sockfd,last_msg,strlen(last_msg), 0, (struct sockaddr *)&cliaddr, len);
-    start_receiving = 1;
-
-    // Subsequent messages
-    while (inst < MAX_NUM)
-    {
-        n = recvfrom(sockfd,mesg,SIZE,0,(struct sockaddr *)&cliaddr,&len);
-        strncpy(last_msg, mesg, 8);
-        last_id = atoi(last_msg);
-        values[index][inst] = last_id;  
-        inst++;
-        n = sendto(sockfd,last_msg,strlen(last_msg), 0, (struct sockaddr *)&cliaddr, len);
+    // Receive & Response 
+    do {
+        n = recvfrom(sockfd,mesg,MAX,0,(struct sockaddr *)&cliaddr,&len);
+        if (n < 0) error("recvfrom");
+        deserialize_value(mesg, &v);
+        values[index][inst++] = v.client_id*1000000 + v.sequence;  
+        int seq = htonl(v.sequence);
+        n = sendto(sockfd,&seq,sizeof(seq), 0, (struct sockaddr *)&cliaddr, len);
+        if (n < 0) error("sendto");
+        start_receiving = 1;
     }
+    while (inst < MAX_SERVER);
     //printf("index:%d interface %s instance: %d\n", index, itf, inst);
-    pthread_exit(&last_id);
+    pthread_exit(NULL);
     return NULL;
 }
 
 void *evalFunc(void *args)
 {
-    int learn[MAX_NUM];
+    int learn[MAX_SERVER];
     while (start_receiving == 0) {sleep(1);}
     //printf("start eval\n");
     struct timespec tstart={0,0}, tend={0,0}, res;
@@ -164,7 +129,7 @@ void *evalFunc(void *args)
     struct timespec ts;
     
 
-    while (cont && i < MAX_NUM) { 
+    while (cont && i < MAX_SERVER) { 
         rc = pthread_mutex_lock(&mutex);
         if (rc != 0) error("mutex lock");
         clock_gettime(CLOCK_REALTIME, &ts);
@@ -173,7 +138,7 @@ void *evalFunc(void *args)
         for (j = 0; j < 4; j++) {
             if (values[j][i] != 0)  {
                 an_instance[j] = values[j][i];
-                printf("%.8d  ", values[j][i]);
+                printf("%.8d\t", values[j][i]);
             } 
             else  {
                 while (values[j][i] == 0)  {
@@ -182,7 +147,7 @@ void *evalFunc(void *args)
                         //printf("Thread blocked: interface %d\n", j);
                         //printf("Wait timed out!\n");
                         an_instance[j] = -1;
-                        printf("%.8s ");
+                        printf("%.8d\t");
                         break;
                     }
                     else     
@@ -279,7 +244,7 @@ int main(int argc, char**argv)
        pthread_join(tid[i], (void**)&(ptr[i])); 
     }
 
-    sleep(5);
+    sleep(20);
     
     cont = 0;
  
