@@ -23,7 +23,7 @@ void *recvFunc(void *arg)
     int sockfd, n;
     struct sockaddr_in servaddr,cliaddr;
     socklen_t len;
-    char mesg[MAX];
+    char mesg[BUF_SIZE];
     char *itf;
     itf = (char*)arg; 
     pthread_mutex_lock(&lock);
@@ -85,7 +85,7 @@ void *recvFunc(void *arg)
     len = sizeof(cliaddr);
     // Receive & Response 
     do {
-        n = recvfrom(sockfd,mesg,MAX,0,(struct sockaddr *)&cliaddr,&len);
+        n = recvfrom(sockfd,mesg,BUF_SIZE,0,(struct sockaddr *)&cliaddr,&len);
         if (n < 0) error("recvfrom");
         deserialize_value(mesg, &v);
         values[index][inst++] = v.client_id*1000000 + v.sequence;  

@@ -38,7 +38,7 @@ void *recvFunc(void *arg)
     int sockfd, n;
     struct sockaddr_in servaddr, cliaddr;
     socklen_t len;
-    char mesg[MAX];
+    char mesg[BUF_SIZE];
     char *itf;
     itf = (char*)arg; 
     pthread_t self_id;
@@ -102,11 +102,11 @@ void *recvFunc(void *arg)
         exit(1);
     }
 
-    char buf[MAX];
+    char buf[BUF_SIZE];
     len = sizeof(cliaddr);
 
     do {
-        n=recvfrom(sockfd,mesg,MAX,0,(struct sockaddr *)&cliaddr,&len);
+        n=recvfrom(sockfd,mesg,BUF_SIZE,0,(struct sockaddr *)&cliaddr,&len);
         deserialize_value(mesg, &v);
         //printf("v.sequence:%d\n", v.sequence);
         fprintf(out, "%d%d\n", v.client_id, v.sequence);

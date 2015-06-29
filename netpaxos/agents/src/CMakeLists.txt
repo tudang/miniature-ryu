@@ -7,6 +7,7 @@ add_executable (validate validate.c)
 add_executable (receiver receiver.c)
 add_executable (sender sender.c)
 add_executable (server server.c)
+add_executable (storage storage.c)
 
 # Link the executable to the library. Since the library has public
 # include directories we will use those link directories when building
@@ -19,3 +20,4 @@ target_link_libraries (server LINK_PUBLIC value)
 target_link_libraries (sender "${CMAKE_THREAD_LIBS_INIT}")
 target_link_libraries (sender -lrt)
 target_link_libraries (sender LINK_PUBLIC value)
+target_link_libraries (storage LINK_PUBLIC value)

@@ -40,7 +40,7 @@ void *recvMsg(void *arg)
     fd_set read_fd_set;
     struct server *s = (struct server*) arg;
     int sock = s->socket;
-    char recvbuf[MAX];
+    char recvbuf[BUF_SIZE];
     struct timeval timeout = {30, 0};
     char last_msg[6];
     int last_id;
@@ -167,7 +167,7 @@ int main(int argc, char **argv)
 
     /* Sending in Main thread */
     fd_set write_fd_set;
-    char buffer[MAX];
+    char buffer[BUF_SIZE];
 
     struct timespec tsp, tstart, tend;
     struct timespec req = {0};
@@ -177,7 +177,7 @@ int main(int argc, char **argv)
     int total = 0;
     int count = 0;
 
-    memset(buffer, '@', MAX);
+    memset(buffer, '@', BUF_SIZE);
 
     FD_ZERO(&write_fd_set);
     FD_SET(sock, &write_fd_set);
