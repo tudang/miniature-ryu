@@ -1,27 +1,5 @@
 /* UDP client in the internet domain */
-#include <pthread.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <netdb.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <string.h>
-#include <time.h>
-#include <sys/time.h>
-#include <sys/fcntl.h>
-#include <ctype.h>
-#include <net/if.h>
-#include <sys/ioctl.h>
-#include <limits.h>
-
-#define GROUP "239.0.0.1"
-#define PORT 8888
-#define MAX_VALUE  1000000 // MAX sequence number
-#define MAX 1470
-#define BILLION 1000000000L
+#include "value.h"
 
 void error(const char *msg);
 void *recvMsg(void *arg);
@@ -33,7 +11,16 @@ struct server {
     unsigned int length;
 };
 
-struct timespec send_tbl[MAX_VALUE] = {1,1};
+
+void serialize_value(value v, char* buffer) {
+    int MSG_SIZE = 28; // size of the output string in sprintf below 
+    char msgid[MSG_SIZE]; 
+    sprintf(msgid, "%2d%06d%lld.%.9ld", v.client_id, v.sequence,
+                        (long long) v.ts.tv_sec, v.ts.tv_nsec);
+    strncpy(buffer, msgid, MSG_SIZE);
+}
+
+struct timespec send_tbl[MAX_CLIENT] = {1,1};
 
 void error(const char *msg)
 {
@@ -53,7 +40,7 @@ void *recvMsg(void *arg)
     fd_set read_fd_set;
     struct server *s = (struct server*) arg;
     int sock = s->socket;
-    char recvbuf[MAX];
+    char recvbuf[BUF_SIZE];
     struct timeval timeout = {30, 0};
     char last_msg[6];
     int last_id;
@@ -67,16 +54,16 @@ void *recvMsg(void *arg)
         int activity = select(sock+1, &read_fd_set, NULL, NULL, NULL);
         if (activity) {
             if(FD_ISSET(sock, &read_fd_set)) {
-                int n = recvfrom(sock, recvbuf, MAX, 0, NULL, NULL);
+                int seq = 0;
+                int n = recvfrom(sock, &seq, sizeof(seq), 0, NULL, NULL);
                 if (n < 0) error("recvfrom");
-                strncpy(last_msg, recvbuf+2, 6);
-                last_id = atoi(last_msg);
+                last_id = ntohl(seq);
+                //printf("last_id:%d\n", last_id);
                 struct timespec end;
                 clock_gettime(CLOCK_REALTIME, &end);
                 uint64_t diff = timediff(send_tbl[last_id], end);
                 total_latency += (diff / 2000);
                 count++;
-                // printf("recv %d bytes: %s\n", n, recvbuf);
             }
         } 
         
@@ -95,6 +82,15 @@ void *recvMsg(void *arg)
 
 int main(int argc, char **argv) 
 {
+    if (argc < 2) {
+        printf("Usage: %s [OPTIONS] interface\n \
+                options:\n \ 
+                -c N client id\n \
+                -n N number of packet per nanosecond\n \
+                -t number of nanosecond to sleep between two send\n", 
+                argv[0]);
+        exit(1);
+    }
     pthread_t sth, rth; // thread identifier
     struct sockaddr_in local, server;
     struct ip_mreq mreq;
@@ -106,6 +102,7 @@ int main(int argc, char **argv)
     int N = 1; // Number of message sending every t ns
     int client_id = 81; // Client id
     char *myniccard;
+    value v;
 
     serv = malloc(sizeof(struct server));
 
@@ -179,7 +176,7 @@ int main(int argc, char **argv)
 
     /* Sending in Main thread */
     fd_set write_fd_set;
-    char buffer[MAX];
+    char buffer[BUF_SIZE];
 
     struct timespec tsp, tstart, tend;
     struct timespec req = {0};
@@ -188,9 +185,8 @@ int main(int argc, char **argv)
 
     int total = 0;
     int count = 0;
-    char msgid[28];
 
-    memset(buffer, '@', MAX);
+    memset(buffer, '@', BUF_SIZE);
 
     FD_ZERO(&write_fd_set);
     FD_SET(sock, &write_fd_set);
@@ -198,22 +194,23 @@ int main(int argc, char **argv)
     // get time start sending
     clock_gettime(CLOCK_REALTIME, &tstart);
 
-    while (count < MAX_VALUE) {
+    while (count < MAX_CLIENT) {
         int activity = select(sock+1, NULL, &write_fd_set, NULL, NULL);
         if (activity) {
             if (FD_ISSET(sock, &write_fd_set)) {
                 // get timestamp and attach to message
                 clock_gettime(CLOCK_REALTIME, &tsp);
-                sprintf(msgid, "%2d%06d%lld.%.9ld", client_id, count+1,
-                        (long long) tsp.tv_sec, tsp.tv_nsec);
-                strncpy(buffer, msgid, 28);
+                v.client_id = client_id;
+                v.sequence = count;
+                v.ts = tsp;
+                serialize_value(v, buffer);
                 // put (value,timestamp)
                 send_tbl[count] = tsp;
                 int n = sendto(sock, buffer, strlen(buffer), 0, 
                             (struct sockaddr *)&server, length);
                 if (n < 0) error("sendto");
                 total += n;
-                //printf("send %d bytes: [%s]\n", n, msgid);
+                //printf("send %d bytes: [%d]\n", n, v.sequence);
             }
         }
         count++;
