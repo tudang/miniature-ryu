@@ -82,6 +82,15 @@ void *recvMsg(void *arg)
 
 int main(int argc, char **argv) 
 {
+    if (argc < 2) {
+        printf("Usage: %s [OPTIONS] interface\n \
+                options:\n \ 
+                -c N client id\n \
+                -n N number of packet per nanosecond\n \
+                -t number of nanosecond to sleep between two send\n", 
+                argv[0]);
+        exit(1);
+    }
     pthread_t sth, rth; // thread identifier
     struct sockaddr_in local, server;
     struct ip_mreq mreq;

@@ -224,7 +224,7 @@ int main(int argc, char**argv)
         return 1;
     }
     */
-    if (argc != 6) { printf("Usage: ./server eth1 eth2 eth3 eth4 output.txt\n"); exit(1);}
+    if (argc != 6) { printf("Usage: %s eth1 eth2 eth3 eth4 output.txt\n", argv[0]); exit(1);}
 
     for(i = 1; i < argc-1; i++) {
         err = pthread_create(&tid[count++], NULL, recvFunc, argv[i]);

@@ -18,7 +18,7 @@
 #include <errno.h>
 
 
-#define GROUP "239.0.0.1"
+#define GROUP "239.0.1.2"
 #define PORT 8888
 #define MAX_CLIENT  1000000 // client's max sequence
 #define BUF_SIZE 1470
