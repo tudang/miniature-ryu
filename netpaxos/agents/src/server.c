@@ -85,11 +85,12 @@ void *recvFunc(void *arg)
     len = sizeof(cliaddr);
     // Receive & Response 
     do {
-        n = recvfrom(sockfd,mesg,BUF_SIZE,0,(struct sockaddr *)&cliaddr,&len);
+        value v;
+        n = recvfrom(sockfd,&v,sizeof(value),0,(struct sockaddr *)&cliaddr,&len);
         if (n < 0) error("recvfrom");
-        deserialize_value(mesg, &v);
-        values[index][inst++] = v.client_id*1000000 + v.sequence;  
-        int seq = htonl(v.sequence);
+        struct header h = v.header;
+        values[index][inst++] = h.client_id*1000000 + h.sequence;  
+        int seq = htonl(h.sequence);
         n = sendto(sockfd,&seq,sizeof(seq), 0, (struct sockaddr *)&cliaddr, len);
         if (n < 0) error("sendto");
         start_receiving = 1;

@@ -58,11 +58,11 @@ int main(int argc, char**argv)
     for (;;)
     {
         len = sizeof(cliaddr);
-        n = recvfrom(sockfd,mesg,BUF_SIZE,0,(struct sockaddr *)&cliaddr,&len);
-        //sendto(sockfd,mesg,n,0,(struct sockaddr *)&cliaddr,sizeof(cliaddr));
-        deserialize_value(mesg, &v);
-        values[instance] = v.sequence;
-        paxos_value = new_value(instance++, 1, 1, v.sequence);
+        value v;
+        n = recvfrom(sockfd,&v,sizeof(value),0,(struct sockaddr *)&cliaddr,&len);
+        struct header h = v.header;
+        values[instance] = h.sequence;
+        paxos_value = new_value(instance++, 1, 1, h.sequence);
         netpaxos_to_string(str_pval, paxos_value);
         fprintf(out, "%s", str_pval);
     }

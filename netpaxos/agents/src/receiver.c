@@ -43,8 +43,6 @@ void *recvFunc(void *arg)
     itf = (char*)arg; 
     pthread_t self_id;
     self_id = pthread_self();
-    char last_msg[9];
-    int last_id = 1;
     int inst = 1;
     value v; 
 
@@ -106,17 +104,21 @@ void *recvFunc(void *arg)
     len = sizeof(cliaddr);
 
     do {
-        n=recvfrom(sockfd,mesg,BUF_SIZE,0,(struct sockaddr *)&cliaddr,&len);
-        deserialize_value(mesg, &v);
-        //printf("v.sequence:%d\n", v.sequence);
-        fprintf(out, "%d%d\n", v.client_id, v.sequence);
+        value v;
+        n=recvfrom(sockfd, &v,sizeof(value),0,(struct sockaddr *)&cliaddr,&len);
+        struct header h = v.header;
+        fprintf(out, "%2.d%.6d\n", h.client_id, h.sequence);
+        char hdr[40];
+        //header_to_string(hdr, h);
+        //fprintf(stdout, "%.1d,%.2d,%.6d,%.d,%s\n", h.msg_type, h.client_id, 
+        //                                            h.sequence, h.buffer_size, v.buffer);
+        
         inst++;
-        int seq = htonl(v.sequence);
+        int seq = htonl(h.sequence);
         n=sendto(sockfd,&seq,sizeof(seq),0,(struct sockaddr *)&cliaddr,len);
     } while (inst < MAX_SERVER - 1);
 
     fclose(out);
-    pthread_exit(&last_id);
+    pthread_exit(NULL);
     return NULL;
 }
-

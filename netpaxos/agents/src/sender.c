@@ -3,7 +3,6 @@
 
 void error(const char *msg);
 void *recvMsg(void *arg);
-uint64_t timediff(struct timespec start, struct timespec end);
 
 struct server {
     int socket;
@@ -12,14 +11,6 @@ struct server {
 };
 
 
-void serialize_value(value v, char* buffer) {
-    int MSG_SIZE = 28; // size of the output string in sprintf below 
-    char msgid[MSG_SIZE]; 
-    sprintf(msgid, "%2d%06d%lld.%.9ld", v.client_id, v.sequence,
-                        (long long) v.ts.tv_sec, v.ts.tv_nsec);
-    strncpy(buffer, msgid, MSG_SIZE);
-}
-
 struct timespec send_tbl[MAX_CLIENT] = {1,1};
 
 void error(const char *msg)
@@ -27,13 +18,6 @@ void error(const char *msg)
     perror(msg);
     exit(1);
 }
-
-uint64_t timediff(struct timespec start, struct timespec end)
-{
-    return (BILLION * (end.tv_sec - start.tv_sec) +
-                    end.tv_nsec - start.tv_nsec);
-}
-
 
 void *recvMsg(void *arg)
 {
@@ -82,15 +66,6 @@ void *recvMsg(void *arg)
 
 int main(int argc, char **argv) 
 {
-    if (argc < 2) {
-        printf("Usage: %s [OPTIONS] interface\n \
-                options:\n \ 
-                -c N client id\n \
-                -n N number of packet per nanosecond\n \
-                -t number of nanosecond to sleep between two send\n", 
-                argv[0]);
-        exit(1);
-    }
     pthread_t sth, rth; // thread identifier
     struct sockaddr_in local, server;
     struct ip_mreq mreq;
@@ -101,12 +76,11 @@ int main(int argc, char **argv)
     int t = 1; // Number of nanoseconds to sleep
     int N = 1; // Number of message sending every t ns
     int client_id = 81; // Client id
-    char *myniccard;
     value v;
 
     serv = malloc(sizeof(struct server));
 
-    while  ((c = getopt (argc, argv, "n:t:c:i:")) != -1) {
+    while  ((c = getopt (argc, argv, "n:t:c:")) != -1) {
         switch(c)
         {
             case 'n':
@@ -120,15 +94,43 @@ int main(int argc, char **argv)
             case 'c':
                 client_id = atoi(optarg);
                 break;
-            
-            case 'i':
-                myniccard = optarg;
-                break;
+
+            case '?':
+                if (optopt == 'n')
+                  fprintf (stderr, "Option -%n requires an argument.\n", optopt);
+                if (optopt == 't')
+                  fprintf (stderr, "Option -%t requires an argument.\n", optopt);
+                if (optopt == 'c')
+                  fprintf (stderr, "Option -%c requires an argument.\n", optopt);
+                else if (isprint (optopt))
+                  fprintf (stderr, "Unknown option `-%c'.\n", optopt);
+                else
+                  fprintf (stderr,
+                           "Unknown option character `\\x%x'.\n",
+                           optopt);
+                return 1;
 
             default:
                 exit(1);
         }
     }
+
+    /*
+    int index;
+    for (index = optind; index < argc; index++)
+        printf ("Non-option argument %d %s\n", index, argv[index]);
+    */
+    
+    if (optind < argc-2) {
+        printf("Usage: %s [OPTIONS] interface\n \
+                options:\n \
+                -c N client id\n \
+                -n N number of packet per nanosecond\n \
+                -t number of nanosecond to sleep between two send\n", 
+                argv[0]);
+        exit(1);
+    }
+    char *myniccard = argv[optind];
     
     int fd;
     struct ifreq ifr;
@@ -176,7 +178,9 @@ int main(int argc, char **argv)
 
     /* Sending in Main thread */
     fd_set write_fd_set;
-    char buffer[BUF_SIZE];
+    
+    // unsigned char buffer[BUF_SIZE];
+    // memset(buffer, '@', BUF_SIZE);
 
     struct timespec tsp, tstart, tend;
     struct timespec req = {0};
@@ -184,9 +188,8 @@ int main(int argc, char **argv)
     req.tv_nsec = t;
 
     int total = 0;
-    int count = 0;
+    int count = 1;
 
-    memset(buffer, '@', BUF_SIZE);
 
     FD_ZERO(&write_fd_set);
     FD_SET(sock, &write_fd_set);
@@ -200,17 +203,22 @@ int main(int argc, char **argv)
             if (FD_ISSET(sock, &write_fd_set)) {
                 // get timestamp and attach to message
                 clock_gettime(CLOCK_REALTIME, &tsp);
-                v.client_id = client_id;
-                v.sequence = count;
-                v.ts = tsp;
-                serialize_value(v, buffer);
-                // put (value,timestamp)
+                struct header h;
+                h.msg_type = ACCEPT;
+                h.client_id = client_id;
+                h.sequence = count;
+                h.ts = tsp;
+                h.buffer_size = 1430;
+                v.header = h;
+            
+                strncpy(v.buffer, "hello NetPaxos", h.buffer_size);
                 send_tbl[count] = tsp;
-                int n = sendto(sock, buffer, strlen(buffer), 0, 
+                size_t msize = sizeof(struct header) + h.buffer_size;
+
+                int n = sendto(sock, &v, msize, 0, 
                             (struct sockaddr *)&server, length);
                 if (n < 0) error("sendto");
                 total += n;
-                //printf("send %d bytes: [%d]\n", n, v.sequence);
             }
         }
         count++;

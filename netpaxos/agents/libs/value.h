@@ -20,15 +20,29 @@
 
 #define GROUP "239.0.1.2"
 #define PORT 8888
-#define MAX_CLIENT  1000000 // client's max sequence
+#define MAX_CLIENT  1000000 - 1// client's max sequence
 #define BUF_SIZE 1470
 #define BILLION 1000000000L
-#define MAX_SERVER 1000000 // receiver's max sequence
+#define MAX_SERVER 1000000 - 1 // receiver's max sequence
 
-typedef struct values {
+enum  message_t {
+    PREPARE,
+    PROMISE,
+    ACCEPT,
+    ACCEPTED
+};
+
+struct header {
+    int msg_type;
     int client_id;
     int sequence;
     struct timespec ts;
+    int buffer_size;
+};
+
+typedef struct values {
+    struct header header;
+    char buffer[1430];
 } value;
 
 
@@ -39,8 +53,7 @@ typedef struct paxosvals {
     int vval;
 } paxosval;
 
-void serialize_value(value v, char* buffer);
-void deserialize_value(char* buffer, value *v);
 uint64_t timediff(struct timespec start, struct timespec end);
 paxosval new_value(int inst, int crnd, int vrnd, int vval);
 void netpaxos_to_string(char *str, paxosval p); 
+void header_to_string(char *str, struct header hd); 
