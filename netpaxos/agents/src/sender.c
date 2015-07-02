@@ -41,8 +41,10 @@ void *recvMsg(void *arg)
                 int seq = 0;
                 int n = recvfrom(sock, &seq, sizeof(seq), 0, NULL, NULL);
                 if (n < 0) error("recvfrom");
-                last_id = ntohl(seq);
+                int current_id = ntohl(seq);
                 //printf("last_id:%d\n", last_id);
+                if (current_id == last_id) continue;
+                last_id = current_id;
                 struct timespec end;
                 clock_gettime(CLOCK_REALTIME, &end);
                 uint64_t diff = timediff(send_tbl[last_id], end);
@@ -208,10 +210,10 @@ int main(int argc, char **argv)
                 h.client_id = client_id;
                 h.sequence = count;
                 h.ts = tsp;
-                h.buffer_size = 1430;
+                h.buffer_size = VALUE_SIZE;
                 v.header = h;
             
-                strncpy(v.buffer, "hello NetPaxos", h.buffer_size);
+                strncpy(v.buffer, "Sample Value for NetPaxos", h.buffer_size);
                 send_tbl[count] = tsp;
                 size_t msize = sizeof(struct header) + h.buffer_size;
 

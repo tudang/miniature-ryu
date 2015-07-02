@@ -24,6 +24,7 @@
 #define BUF_SIZE 1470
 #define BILLION 1000000000L
 #define MAX_SERVER 1000000 - 1 // receiver's max sequence
+#define VALUE_SIZE 1430
 
 enum  message_t {
     PREPARE,
@@ -42,7 +43,7 @@ struct header {
 
 typedef struct values {
     struct header header;
-    char buffer[1430];
+    char buffer[VALUE_SIZE];
 } value;
 
 

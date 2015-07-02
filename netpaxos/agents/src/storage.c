@@ -1,7 +1,5 @@
 #include "value.h"
 
-#define VAL_LEN 9
-
 int main(int argc, char**argv)
 {
 
@@ -14,11 +12,8 @@ int main(int argc, char**argv)
     struct sockaddr_in servaddr,cliaddr;
     socklen_t len;
     int instance;
-    char mesg[BUF_SIZE];
-    char str_value[VAL_LEN];
     int values[MAX_SERVER];
     struct ip_mreq mreq;
-    value v;
     paxosval paxos_value;
     FILE *out;
     char str_pval[20];
@@ -47,7 +42,7 @@ int main(int argc, char**argv)
         exit(1);
     }
     
-    printf("listening on port: %d \n", PORT);
+    printf("Listening on port: %d \n", PORT);
 
     out = fopen(argv[1], "w+");
     if (out == NULL) {
@@ -61,10 +56,28 @@ int main(int argc, char**argv)
         value v;
         n = recvfrom(sockfd,&v,sizeof(value),0,(struct sockaddr *)&cliaddr,&len);
         struct header h = v.header;
-        values[instance] = h.sequence;
-        paxos_value = new_value(instance++, 1, 1, h.sequence);
-        netpaxos_to_string(str_pval, paxos_value);
-        fprintf(out, "%s", str_pval);
+         switch (h.msg_type) {
+            case PREPARE:
+                break;
+            case PROMISE:
+                break;
+            case ACCEPT:
+                values[instance] = h.sequence;
+                paxos_value = new_value(instance++, 1, 1, h.sequence);
+                netpaxos_to_string(str_pval, paxos_value);
+                fprintf(out, "%s", str_pval);
+                // response to sender
+                int seq = htonl(h.sequence);
+                n = sendto(sockfd,&seq,sizeof(seq), 0, (struct sockaddr *)&cliaddr, len);
+                if (n < 0) error("sendto");
+                break;
+            case ACCEPTED:
+                break;
+            default:
+                printf("Error unusual case\n");
+                break;
+        }
+        if (instance % 100000 == 0) printf("Received %d values\n", instance);
     }
 
     fclose(out);

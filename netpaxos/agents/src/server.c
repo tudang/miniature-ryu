@@ -23,7 +23,6 @@ void *recvFunc(void *arg)
     int sockfd, n;
     struct sockaddr_in servaddr,cliaddr;
     socklen_t len;
-    char mesg[BUF_SIZE];
     char *itf;
     itf = (char*)arg; 
     pthread_mutex_lock(&lock);
@@ -32,7 +31,6 @@ void *recvFunc(void *arg)
     pthread_t self_id;
     self_id = pthread_self();
     //printf("index:%d interface %s\n", index, itf);
-    value v;
     int inst = 0;
     sockfd=socket(AF_INET,SOCK_DGRAM,0);
     if (sockfd < 0) {
