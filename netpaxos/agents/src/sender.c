@@ -1,10 +1,95 @@
 /* UDP client in the internet domain */
 #include "value.h"
 
+void usage(char *program);
+void parseArguments(int argc, char **argv, int *t, int *N, int *id);
 void *recvMsg(void *arg);
 struct timespec send_tbl[MAX_CLIENT] = {1,1};
 
+int submit_value(int sock, char *str, int len, int N, int client_id, struct timespec req) {
+    struct timespec tsp;
+    int total = 0;
+    int count = 1;
+    struct sockaddr_in server;
+    server.sin_family = AF_INET;
+    server.sin_addr.s_addr = inet_addr(GROUP);
+    server.sin_port = htons(PORT);
+    size_t length = sizeof(struct sockaddr_in);
+    value v;
+    while (count < MAX_CLIENT) {
+        clock_gettime(CLOCK_REALTIME, &tsp);
+        struct header h;
+        h.msg_type = ACCEPT;
+        h.client_id = client_id;
+        h.sequence = count;
+        h.ts = tsp;
+        h.buffer_size = len;
+        v.header = h;
+        strncpy(v.buffer, str, len);
+        send_tbl[count] = tsp;
+        size_t msize = sizeof(struct header) + h.buffer_size;
+        int n = sendto(sock, &v, msize, 0, 
+                    (struct sockaddr *)&server, length);
+        if (n < 0) error("sendto");
+        total += n;
+        count++;
+        if ((count % N) == 0) 
+            nanosleep(&req, (struct timespec *)NULL);
+    }
+    return count;
+}
 
+int main(int argc, char **argv) {
+    pthread_t sth, rth; // thread identifier
+    struct sockaddr_in local;
+    struct ip_mreq mreq;
+    struct hostent *he;
+    unsigned int length;
+    int t = 1; // Number of nanoseconds to sleep
+    int N = 1; // Number of message sending every t ns
+    int client_id = 81; // Client id
+    struct timespec tstart, tend;
+    struct timespec req = {0, t};
+
+    if (argc < 2) {
+        usage(argv[0]);
+        exit(1);
+    }
+    parseArguments(argc, argv, &t, &N, &client_id);
+    char *myniccard = argv[optind];
+    char *itf_addr = get_interface_addr(myniccard);
+    /* Create socket */
+    int sock;
+    sock = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sock < 0) error("socket");
+    if (fcntl(sock, F_SETFL, O_NONBLOCK) < 0) error("fcntl error");
+    int ttl = 1; 
+    setsockopt (sock, IPPROTO_IP, IP_TTL, &ttl, sizeof(ttl));
+    local.sin_family = AF_INET;
+    local.sin_addr.s_addr = inet_addr(itf_addr);
+    local.sin_port = htons(PORT);
+    bind(sock, (struct sockaddr *)&local, sizeof(local));
+    /* Create worker thread */
+    pthread_create(&rth, NULL, recvMsg, (void*)&sock);
+    /* Sending in Main thread */
+    fd_set write_fd_set;
+    FD_ZERO(&write_fd_set);
+    FD_SET(sock, &write_fd_set);
+    // get time start sending
+    clock_gettime(CLOCK_REALTIME, &tstart);
+    char sample[] = "Test value";
+    int count = submit_value(sock, sample, strlen(sample), N, client_id,  req); 
+    // get time end sending
+    clock_gettime(CLOCK_REALTIME, &tend);
+    float duration = timediff(tstart, tend) / BILLION;
+    printf("packets/second: %3.2f\n", (float) count / duration);
+    printf("Mbps/second: %3.2f\n", (float) count * 8 * (VALUE_SIZE + 42) / 1000000 / duration);
+    /* wait for our thread to finish before continuing */
+    sleep(5);
+    pthread_cancel(rth);
+    printf("Main exit.\n"); 
+    return 0;
+}
 void *recvMsg(void *arg) {
     fd_set read_fd_set;
     int sock = *((int*) arg);
@@ -93,85 +178,3 @@ void parseArguments(int argc, char **argv, int *t, int *N, int *id) {
     */
 }
 
-int main(int argc, char **argv) {
-    pthread_t sth, rth; // thread identifier
-    struct sockaddr_in local, server;
-    struct ip_mreq mreq;
-    struct hostent *he;
-    unsigned int length;
-    int t = 1; // Number of nanoseconds to sleep
-    int N = 1; // Number of message sending every t ns
-    int client_id = 81; // Client id
-    struct timespec tsp, tstart, tend;
-    struct timespec req = {0, t};
-    int total = 0;
-    int count = 1;
-    value v;
-
-    if (argc < 2) {
-        usage(argv[0]);
-        exit(1);
-    }
-    parseArguments(argc, argv, &t, &N, &client_id);
-    char *myniccard = argv[optind];
-    char *itf_addr = get_interface_addr(myniccard);
-    /* Create socket */
-    int sock;
-    sock = socket(AF_INET, SOCK_DGRAM, 0);
-    if (sock < 0) error("socket");
-    if (fcntl(sock, F_SETFL, O_NONBLOCK) < 0) error("fcntl error");
-    int ttl = 1; 
-    setsockopt (sock, IPPROTO_IP, IP_TTL, &ttl, sizeof(ttl));
-    local.sin_family = AF_INET;
-    local.sin_addr.s_addr = inet_addr(itf_addr);
-    local.sin_port = htons(PORT);
-    bind(sock, (struct sockaddr *)&local, sizeof(local));
-    server.sin_family = AF_INET;
-    server.sin_addr.s_addr = inet_addr(GROUP);
-    server.sin_port = htons(PORT);
-    length = sizeof(struct sockaddr_in);
-    /* Create worker thread */
-    pthread_create(&rth, NULL, recvMsg, (void*)&sock);
-    /* Sending in Main thread */
-    fd_set write_fd_set;
-    FD_ZERO(&write_fd_set);
-    FD_SET(sock, &write_fd_set);
-    // get time start sending
-    clock_gettime(CLOCK_REALTIME, &tstart);
-    while (count < MAX_CLIENT) {
-        int activity = select(sock+1, NULL, &write_fd_set, NULL, NULL);
-        if (activity) {
-            if (FD_ISSET(sock, &write_fd_set)) {
-                // get timestamp and attach to message
-                clock_gettime(CLOCK_REALTIME, &tsp);
-                struct header h;
-                h.msg_type = ACCEPT;
-                h.client_id = client_id;
-                h.sequence = count;
-                h.ts = tsp;
-                h.buffer_size = VALUE_SIZE;
-                v.header = h;
-                strncpy(v.buffer, "Sample Value for NetPaxos", h.buffer_size);
-                send_tbl[count] = tsp;
-                size_t msize = sizeof(struct header) + h.buffer_size;
-                int n = sendto(sock, &v, msize, 0, 
-                            (struct sockaddr *)&server, length);
-                if (n < 0) error("sendto");
-                total += n;
-            }
-        }
-        count++;
-        if ((count % N) == 0) 
-            nanosleep(&req, (struct timespec *)NULL);
-    }
-    // get time end sending
-    clock_gettime(CLOCK_REALTIME, &tend);
-    float duration = timediff(tstart, tend) / BILLION;
-    printf("packets/second: %3.2f\n", (float) count / duration);
-    printf("Mbps/second: %3.2f\n", (float) count * 8 * (VALUE_SIZE + 42) / 1000000 / duration);
-    /* wait for our thread to finish before continuing */
-    sleep(5);
-    pthread_cancel(rth);
-    printf("Main exit.\n"); 
-    return 0;
-}
