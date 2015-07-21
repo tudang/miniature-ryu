@@ -65,7 +65,6 @@ void *recvFunc(void *arg)
     else
         perror("inet_ntop");
     
-    
     struct ip_mreq mreq;
 
     mreq.imr_multiaddr.s_addr = inet_addr(GROUP);
@@ -75,7 +74,7 @@ void *recvFunc(void *arg)
         error("setsockopt mreq");
         exit(1);
     }
-    
+  
     if (bind(sockfd,(struct sockaddr *)&servaddr,sizeof(servaddr)) < 0) {
         error("bind");
         exit(1);
@@ -89,8 +88,10 @@ void *recvFunc(void *arg)
         struct header h = v.header;
         values[index][inst++] = h.client_id*1000000 + h.sequence;  
         int seq = htonl(h.sequence);
-        n = sendto(sockfd,&seq,sizeof(seq), 0, (struct sockaddr *)&cliaddr, len);
-        if (n < 0) error("sendto");
+        if (index == 1) {
+            n = sendto(sockfd,&seq,sizeof(seq), 0, (struct sockaddr *)&cliaddr, len);
+            if (n < 0) error("sendto");
+        }
         start_receiving = 1;
     }
     while (inst < MAX_SERVER);
@@ -216,6 +217,7 @@ int main(int argc, char**argv)
     int count = 0;
     int *ptr[4];
     pthread_t eval_th; // thread to check majority of value 
+    pthread_t recovery_thread;
    /* 
      if (pthread_mutex_init(&lock, NULL) != 0)
     {
@@ -223,7 +225,7 @@ int main(int argc, char**argv)
         return 1;
     }
     */
-    if (argc != 6) { printf("Usage: %s eth1 eth2 eth3 eth4 output.txt\n", argv[0]); exit(1);}
+    if (argc != 6) { printf("Usage: %s eth0 eth1 eth2 eth3 output.txt\n", argv[0]); exit(1);}
 
     for(i = 1; i < argc-1; i++) {
         err = pthread_create(&tid[count++], NULL, recvFunc, argv[i]);
@@ -243,12 +245,51 @@ int main(int argc, char**argv)
        pthread_join(tid[i], (void**)&(ptr[i])); 
     }
 
-    sleep(20);
+    sleep(10);
+    pthread_cancel(eval_th);
     
     cont = 0;
  
     pthread_join(eval_th, NULL);
 
     //printf("Main end\n");
-    //pthread_cancel(eval_th);
+}
+
+
+int send_multicast_socket(char* group, int port, value v) {
+
+    struct sockaddr_in server;
+    int n;
+    int sock = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sock < 0) error("create socket");
+
+    if (fcntl(sock, F_SETFL, O_NONBLOCK) < 0) error("fcntl error");
+
+    server.sin_family = AF_INET;
+    server.sin_addr.s_addr = inet_addr(group);
+    server.sin_port = htons(port);
+    unsigned int length = sizeof(struct sockaddr_in);
+
+    fd_set write_fd_set;
+    FD_ZERO(&write_fd_set);
+    FD_SET(sock, &write_fd_set);
+    
+
+    while(1) {
+        if (select(FD_SETSIZE, NULL, &write_fd_set, NULL, NULL) < 0)
+            error("select");
+      
+        if (FD_ISSET(sock, &write_fd_set)) {
+            // Run simple Paxos
+            struct header h;
+            h = v.header;
+            h.msg_type = PREPARE;
+            h.buffer_size = VALUE_SIZE;
+            int msize = sizeof(struct header) + h.buffer_size;
+            n = sendto(sock, &v, msize, 0, 
+                        (struct sockaddr *)&server, length);
+            if (n < 0) error("sendto");
+        }
+    }
+
 }

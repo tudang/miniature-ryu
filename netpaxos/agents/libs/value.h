@@ -17,13 +17,15 @@
 #include <limits.h>
 #include <errno.h>
 
-
+#define NUMBER_OF_VALUE 1000000
 #define GROUP "239.0.1.2"
-#define PORT 8888
-#define MAX_CLIENT  1000000 - 1// client's max sequence
+//#define GROUP "192.168.4.91"
+#define PORT 50001
+#define RECOVER_PORT 50002
+#define MAX_CLIENT   NUMBER_OF_VALUE/2 // client's max sequence
 #define BUF_SIZE 1470
 #define BILLION 1000000000L
-#define MAX_SERVER 1000000 - 1 // receiver's max sequence
+#define MAX_SERVER NUMBER_OF_VALUE - 1000 // receiver's max sequence
 #define VALUE_SIZE 1430
 
 enum  message_t {

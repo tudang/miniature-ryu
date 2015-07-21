@@ -53,7 +53,8 @@ void *recvMsg(void *arg)
             }
         } 
         
-        if ((count%100000) == 0)
+        // if ((count%100000) == 0) 
+        if ((count%100) == 0) // For DEBUG
         {
             printf("Avg. Latency: %ld / %d = %3.2f us\n", total_latency, count,
             ((float) total_latency / count));
@@ -140,7 +141,7 @@ int main(int argc, char **argv)
     fd = socket(AF_INET, SOCK_DGRAM, 0);
 
     /* I want to get an IPv4 IP address */
-      ifr.ifr_addr.sa_family = AF_INET;
+    ifr.ifr_addr.sa_family = AF_INET;
 
       /* I want IP address attached to "eth0" */
     strncpy(ifr.ifr_name, myniccard, IFNAMSIZ-1);
@@ -159,7 +160,8 @@ int main(int argc, char **argv)
     if (fcntl(sock, F_SETFL, O_NONBLOCK) < 0)
         error("fcntl error");
     
-    
+    int ttl = 1; 
+    setsockopt (sock, IPPROTO_IP, IP_TTL, &ttl, sizeof(ttl));
     local.sin_family = AF_INET;
     local.sin_addr.s_addr = inet_addr(itf_addr);
     local.sin_port = htons(PORT);
@@ -233,6 +235,7 @@ int main(int argc, char **argv)
     clock_gettime(CLOCK_REALTIME, &tend);
     float duration = timediff(tstart, tend) / BILLION;
     printf("packets/second: %3.2f\n", (float) count / duration);
+    printf("Mbps/second: %3.2f\n", (float) count * 8 * (VALUE_SIZE + 42) / 1000000 / duration);
     /* wait for our thread to finish before continuing */
     sleep(5);
     pthread_cancel(rth);

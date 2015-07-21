@@ -47,7 +47,7 @@ def send_flow_group(datapath, in_port, ipsrc, ipdest, group_id):
     priority = 32
     match = ofp_parser.OFPMatch(in_port=in_port, 
                                 eth_type=0x0800, 
-                                ipv4_src=ipsrc, ipv4_dst=ipdest)
+                                ipv4_src=ipsrc, ipv4_dst=ipdest )
     actions = [ofp_parser.OFPActionGroup(group_id)]
     send_msg(datapath, priority, match, actions)
 

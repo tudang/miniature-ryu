@@ -74,7 +74,7 @@ void *recvFunc(void *arg)
     char itf_addr[INET_ADDRSTRLEN]; 
     if (inet_ntop(AF_INET, &sin, itf_addr, sizeof(itf_addr)) == NULL)
         perror("inet_ntop");
-    
+
     struct ip_mreq mreq;
 
     mreq.imr_multiaddr.s_addr = inet_addr(GROUP);
@@ -84,7 +84,7 @@ void *recvFunc(void *arg)
         error("setsockopt mreq");
         exit(1);
     }
-    
+  
     if (bind(sockfd,(struct sockaddr *)&servaddr,sizeof(servaddr)) < 0) {
         error("bind");
         exit(1);

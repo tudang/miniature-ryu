@@ -37,7 +37,7 @@ class SimpleSwitchIgmp(app_manager.RyuApp):
         # if you want a switch to operate as a querier,
         # set up as follows:
         self._snoop.set_querier_mode(
-           dpid=str_to_dpid('678cc454444f2bd8'), server_port=2)
+           dpid=str_to_dpid('678cc454444f2bd8'), server_port=46)
         # dpid         the datapath id that will operate as a querier.
         # server_port  a port number which connect to the multicast
         #              server.
