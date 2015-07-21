@@ -60,3 +60,5 @@ uint64_t timediff(struct timespec start, struct timespec end);
 paxosval new_value(int inst, int crnd, int vrnd, int vval);
 void netpaxos_to_string(char *str, paxosval p); 
 void header_to_string(char *str, struct header hd); 
+void error(const char *msg);
+char *get_interface_addr(char *itfname);
