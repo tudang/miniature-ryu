@@ -62,3 +62,5 @@ void netpaxos_to_string(char *str, paxosval p);
 void header_to_string(char *str, struct header hd); 
 void error(const char *msg);
 char *get_interface_addr(char *itfname);
+void addMembership(int *sock, char *group, char *itf_addr);
+int newInterfaceBoundSocket(char *itf);

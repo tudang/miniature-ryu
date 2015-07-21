@@ -32,49 +32,15 @@ void *recvFunc(void *arg)
     self_id = pthread_self();
     //printf("index:%d interface %s\n", index, itf);
     int inst = 0;
-    sockfd=socket(AF_INET,SOCK_DGRAM,0);
-    if (sockfd < 0) {
-        error("ERROR opening socket");
-        exit(1);
-    }
-
-    if (setsockopt(sockfd, SOL_SOCKET, SO_BINDTODEVICE, 
-                            itf, strlen(itf)) < 0) 
-    {
-        perror("Setsockopt Error\n");
-        exit(1);    
-    } 
-
- 
+    sockfd =  newInterfaceBoundSocket(itf);
     bzero(&servaddr,sizeof(servaddr));
     servaddr.sin_family = AF_INET;
     servaddr.sin_addr.s_addr=htonl(INADDR_ANY);
     servaddr.sin_port=htons(PORT);
 
+    char *itf_addr = get_interface_addr(itf);
 
-    struct ifreq ifr;
-    ifr.ifr_addr.sa_family = AF_INET;
-    strncpy(ifr.ifr_name, itf, IFNAMSIZ-1);
-    ioctl(sockfd, SIOCGIFADDR, &ifr);
-    struct in_addr sin = ((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr;
-    char itf_addr[INET_ADDRSTRLEN]; 
-    if (inet_ntop(AF_INET, &sin, itf_addr, sizeof(itf_addr)))
-        {
-        //printf("%s\n", itf_addr);
-        }
-    else
-        perror("inet_ntop");
-    
-    struct ip_mreq mreq;
-
-    mreq.imr_multiaddr.s_addr = inet_addr(GROUP);
-    mreq.imr_interface.s_addr = inet_addr(itf_addr);
-
-    if (setsockopt(sockfd, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) < 0) {
-        error("setsockopt mreq");
-        exit(1);
-    }
-  
+    addMembership(&sockfd, GROUP, itf_addr); 
     if (bind(sockfd,(struct sockaddr *)&servaddr,sizeof(servaddr)) < 0) {
         error("bind");
         exit(1);
@@ -133,7 +99,7 @@ void *evalFunc(void *args)
         rc = pthread_mutex_lock(&mutex);
         if (rc != 0) error("mutex lock");
         clock_gettime(CLOCK_REALTIME, &ts);
-        ts.tv_sec += 1; // WAIT_TIME_SECONDS;
+        ts.tv_nsec += 1000; // WAIT_TIME_SECONDS;
         int an_instance[4];
         for (j = 0; j < 4; j++) {
             if (values[j][i] != 0)  {

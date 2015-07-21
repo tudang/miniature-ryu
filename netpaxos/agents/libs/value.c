@@ -47,3 +47,29 @@ char *get_interface_addr(char *itfname) {
     return itf_addr;
 }
 
+void addMembership(int *sock, char *group, char *itf_addr) {
+    struct ip_mreq mreq;
+    mreq.imr_multiaddr.s_addr = inet_addr(group);
+    mreq.imr_interface.s_addr = inet_addr(itf_addr);
+
+    if (setsockopt(*sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, 
+    &mreq, sizeof(mreq)) < 0) {
+        error("setsockopt mreq");
+        exit(1);
+    }
+}
+
+int newInterfaceBoundSocket(char *itf) {
+    int sockfd = socket(AF_INET,SOCK_DGRAM,0);
+    if (sockfd < 0) {
+        error("ERROR opening socket");
+        exit(1);
+    }
+
+    if (setsockopt(sockfd, SOL_SOCKET, SO_BINDTODEVICE, 
+                            itf, strlen(itf)) < 0) {
+        perror("Setsockopt Error\n");
+        exit(1);    
+    } 
+    return sockfd;
+}

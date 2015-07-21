@@ -35,7 +35,7 @@ int main(int argc, char**argv)
 /* This is thread function */
 void *recvFunc(void *arg)
 {
-    int sockfd, n;
+    int n;
     struct sockaddr_in servaddr, cliaddr;
     socklen_t len;
     char mesg[BUF_SIZE];
@@ -46,18 +46,7 @@ void *recvFunc(void *arg)
     int inst = 1;
     value v; 
 
-    sockfd=socket(AF_INET,SOCK_DGRAM,0);
-    if (sockfd < 0) {
-        error("ERROR opening socket");
-        exit(1);
-    }
-
-    if (setsockopt(sockfd, SOL_SOCKET, SO_BINDTODEVICE, 
-                            itf, strlen(itf)) < 0) 
-    {
-        perror("Setsockopt Error\n");
-        exit(1);    
-    } 
+    int sockfd = newInterfaceBoundSocket(itf);
 
  
     bzero(&servaddr,sizeof(servaddr));
@@ -66,24 +55,8 @@ void *recvFunc(void *arg)
     servaddr.sin_port=htons(PORT);
 
 
-    struct ifreq ifr;
-    ifr.ifr_addr.sa_family = AF_INET;
-    strncpy(ifr.ifr_name, itf, IFNAMSIZ-1);
-    ioctl(sockfd, SIOCGIFADDR, &ifr);
-    struct in_addr sin = ((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr;
-    char itf_addr[INET_ADDRSTRLEN]; 
-    if (inet_ntop(AF_INET, &sin, itf_addr, sizeof(itf_addr)) == NULL)
-        perror("inet_ntop");
-
-    struct ip_mreq mreq;
-
-    mreq.imr_multiaddr.s_addr = inet_addr(GROUP);
-    mreq.imr_interface.s_addr = inet_addr(itf_addr);
-
-    if (setsockopt(sockfd,IPPROTO_IP,IP_ADD_MEMBERSHIP,&mreq,sizeof(mreq))<0) {
-        error("setsockopt mreq");
-        exit(1);
-    }
+    char *itf_addr = get_interface_addr(itf);
+    addMembership(&sockfd, GROUP, itf_addr);
   
     if (bind(sockfd,(struct sockaddr *)&servaddr,sizeof(servaddr)) < 0) {
         error("bind");

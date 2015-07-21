@@ -6,32 +6,35 @@ void parseArguments(int argc, char **argv, int *t, int *N, int *id);
 void *recvMsg(void *arg);
 struct timespec send_tbl[MAX_CLIENT] = {1,1};
 
-int submit_value(int sock, char *str, int len, int N, int client_id, struct timespec req) {
+struct timespec submitValue(int sock, char* str, int len, int client_id, int count) {
     struct timespec tsp;
-    int total = 0;
-    int count = 1;
     struct sockaddr_in server;
     server.sin_family = AF_INET;
     server.sin_addr.s_addr = inet_addr(GROUP);
     server.sin_port = htons(PORT);
     size_t length = sizeof(struct sockaddr_in);
     value v;
+    clock_gettime(CLOCK_REALTIME, &tsp);
+    struct header h;
+    h.msg_type = ACCEPT;
+    h.client_id = client_id;
+    h.sequence = count;
+    h.ts = tsp;
+    h.buffer_size = len;
+    v.header = h;
+    strncpy(v.buffer, str, len);
+    size_t msize = sizeof(struct header) + h.buffer_size;
+    int n = sendto(sock, &v, msize, 0, 
+                (struct sockaddr *)&server, length);
+    if (n < 0) error("sendto");
+    send_tbl[count] = tsp;
+    return tsp;
+}
+
+int submitValues(int sock, char *str, int len, int N, int client_id, struct timespec req) {
+    int count = 1;
     while (count < MAX_CLIENT) {
-        clock_gettime(CLOCK_REALTIME, &tsp);
-        struct header h;
-        h.msg_type = ACCEPT;
-        h.client_id = client_id;
-        h.sequence = count;
-        h.ts = tsp;
-        h.buffer_size = len;
-        v.header = h;
-        strncpy(v.buffer, str, len);
-        send_tbl[count] = tsp;
-        size_t msize = sizeof(struct header) + h.buffer_size;
-        int n = sendto(sock, &v, msize, 0, 
-                    (struct sockaddr *)&server, length);
-        if (n < 0) error("sendto");
-        total += n;
+        submitValue(sock, str, len, client_id, count); 
         count++;
         if ((count % N) == 0) 
             nanosleep(&req, (struct timespec *)NULL);
@@ -78,7 +81,7 @@ int main(int argc, char **argv) {
     // get time start sending
     clock_gettime(CLOCK_REALTIME, &tstart);
     char sample[] = "Test value";
-    int count = submit_value(sock, sample, strlen(sample), N, client_id,  req); 
+    int count = submitValues(sock, sample, strlen(sample), N, client_id,  req); 
     // get time end sending
     clock_gettime(CLOCK_REALTIME, &tend);
     float duration = timediff(tstart, tend) / BILLION;
