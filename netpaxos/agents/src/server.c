@@ -1,16 +1,40 @@
 #include "value.h"
 
 pthread_t tid[4]; // this is thread identifier
-
 int values[4][MAX_SERVER];  // value queues
 int start_receiving = 0;
 pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
-int idx = 0;
-
 pthread_cond_t      cond  = PTHREAD_COND_INITIALIZER;
 pthread_mutex_t     mutex = PTHREAD_MUTEX_INITIALIZER;
-
 int cont = 1; // share variable between main & eval thread
+int printarray = 1;
+
+char* kv[MAX_SERVER];
+
+void init_kv() {
+    int i;
+    for (i=0; i < MAX_SERVER; i++) {
+        kv[i] = malloc(VALUE_SIZE);
+    }
+}
+
+void put(int key, char* value, int size) {
+    strncpy(kv[key], value, size);
+}
+
+
+void update(int key, char* value, int size) {
+    strncpy(kv[key], value, size);
+}
+
+char *get(int key) {
+    return kv[key];
+}
+
+void delete(int key) {
+    memset(kv[key],'\0', strlen(kv[key]));
+}
+
 
 struct thread_args {
     int index;
@@ -23,61 +47,19 @@ void *recvFunc(void *arg)
     int sockfd, n;
     struct sockaddr_in servaddr,cliaddr;
     socklen_t len;
-    char mesg[BUF_SIZE];
-    char *itf;
-    itf = (char*)arg; 
-    pthread_mutex_lock(&lock);
-    int index = idx++;
-    pthread_mutex_unlock(&lock);
+    struct thread_args *itf;
+    itf = (struct thread_args*)arg; 
+    int index = itf->index;
+    int inst = 0;
     pthread_t self_id;
     self_id = pthread_self();
-    //printf("index:%d interface %s\n", index, itf);
-    value v;
-    int inst = 0;
-    sockfd=socket(AF_INET,SOCK_DGRAM,0);
-    if (sockfd < 0) {
-        error("ERROR opening socket");
-        exit(1);
-    }
-
-    if (setsockopt(sockfd, SOL_SOCKET, SO_BINDTODEVICE, 
-                            itf, strlen(itf)) < 0) 
-    {
-        perror("Setsockopt Error\n");
-        exit(1);    
-    } 
-
- 
+    sockfd =  newInterfaceBoundSocket(itf->itf);
     bzero(&servaddr,sizeof(servaddr));
     servaddr.sin_family = AF_INET;
     servaddr.sin_addr.s_addr=htonl(INADDR_ANY);
     servaddr.sin_port=htons(PORT);
-
-
-    struct ifreq ifr;
-    ifr.ifr_addr.sa_family = AF_INET;
-    strncpy(ifr.ifr_name, itf, IFNAMSIZ-1);
-    ioctl(sockfd, SIOCGIFADDR, &ifr);
-    struct in_addr sin = ((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr;
-    char itf_addr[INET_ADDRSTRLEN]; 
-    if (inet_ntop(AF_INET, &sin, itf_addr, sizeof(itf_addr)))
-        {
-        //printf("%s\n", itf_addr);
-        }
-    else
-        perror("inet_ntop");
-    
-    
-    struct ip_mreq mreq;
-
-    mreq.imr_multiaddr.s_addr = inet_addr(GROUP);
-    mreq.imr_interface.s_addr = inet_addr(itf_addr);
-
-    if (setsockopt(sockfd, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) < 0) {
-        error("setsockopt mreq");
-        exit(1);
-    }
-    
+    char *itf_addr = get_interface_addr(itf->itf);
+    addMembership(&sockfd, GROUP, itf_addr); 
     if (bind(sockfd,(struct sockaddr *)&servaddr,sizeof(servaddr)) < 0) {
         error("bind");
         exit(1);
@@ -85,17 +67,22 @@ void *recvFunc(void *arg)
     len = sizeof(cliaddr);
     // Receive & Response 
     do {
-        n = recvfrom(sockfd,mesg,BUF_SIZE,0,(struct sockaddr *)&cliaddr,&len);
+        value v;
+        n = recvfrom(sockfd,&v,sizeof(value),0,(struct sockaddr *)&cliaddr,&len);
         if (n < 0) error("recvfrom");
-        deserialize_value(mesg, &v);
-        values[index][inst++] = v.client_id*1000000 + v.sequence;  
-        int seq = htonl(v.sequence);
-        n = sendto(sockfd,&seq,sizeof(seq), 0, (struct sockaddr *)&cliaddr, len);
-        if (n < 0) error("sendto");
+        struct header h = v.header;
+        //printf("(%d,%s)\n", inst, v.value);
+        values[index][inst] = h.key;  
+        int seq = htonl(h.key >> 4);
+        if (index == 0) {
+            put(inst, v.value, strlen(v.value));
+            n = sendto(sockfd,&seq,sizeof(seq), 0, (struct sockaddr *)&cliaddr, len);
+            if (n < 0) error("sendto");
+        }
+        inst++;
         start_receiving = 1;
     }
     while (inst < MAX_SERVER);
-    //printf("index:%d interface %s instance: %d\n", index, itf, inst);
     pthread_exit(NULL);
     return NULL;
 }
@@ -104,68 +91,53 @@ void *evalFunc(void *args)
 {
     int learn[MAX_SERVER];
     while (start_receiving == 0) {sleep(1);}
-    //printf("start eval\n");
     struct timespec tstart={0,0}, tend={0,0}, res;
     clock_gettime(CLOCK_REALTIME, &tstart);
     int j, i = 0, k = 0;
     int decided_counter = 0;
     int undecided_counter = 0;
-
-
     FILE *out;
     char filename[20];
     char *tname;
     tname  = (char *)args;
     sprintf(filename, "/tmp/%s", tname);
-    //printf("filename:%s\n", filename);
     out = fopen(filename ,"w");
-
     if (out == NULL) {
         perror("Error opening file");
         exit(1);
     }
-
     int rc;
     struct timespec ts;
-    
-
     while (cont && i < MAX_SERVER) { 
         rc = pthread_mutex_lock(&mutex);
         if (rc != 0) error("mutex lock");
         clock_gettime(CLOCK_REALTIME, &ts);
-        ts.tv_sec += 1; // WAIT_TIME_SECONDS;
+        ts.tv_nsec += 1000000; // WAIT_TIME_SECONDS;
         int an_instance[4];
         for (j = 0; j < 4; j++) {
             if (values[j][i] != 0)  {
                 an_instance[j] = values[j][i];
-                printf("%.8d\t", values[j][i]);
+                if (printarray) fprintf(out, "%.8d\t", values[j][i]);
             } 
             else  {
                 while (values[j][i] == 0)  {
                     rc = pthread_cond_timedwait(&cond, &mutex, &ts);
                     if (rc == ETIMEDOUT) {
-                        //printf("Thread blocked: interface %d\n", j);
-                        //printf("Wait timed out!\n");
                         an_instance[j] = -1;
-                        printf("%.8d\t");
+                        if (printarray) fprintf(out, "%.8d\t");
                         break;
-                    }
-                    else     
-                    {
-                        an_instance[j] = values[j][i];
-                        //printf("Wait not timed out!\n");
-                    }
+                    } else { an_instance[j] = values[j][i]; }
                 }
             }
         }
         int selected = findMajorityElement(an_instance, 4); 
         if (selected != -1) decided_counter++;
         else undecided_counter++;
-        printf("%.8d\n", selected);
+        if (printarray) fprintf(out, "%.8d\n", selected);
        
         //printf("inst:%d chosen:%8d\n", i, selected);
         learn[k++] = selected;
-        fprintf(out, "%d\n", selected);
+        if (printarray) fprintf(out, "%d\n", selected);
         // aggregate latency
         if ((i%100000) == 0) {
             clock_gettime(CLOCK_REALTIME, &tend);
@@ -176,6 +148,7 @@ void *evalFunc(void *args)
             //printf("indecision: %.5f\n",(double)undecided_counter / (undecided_counter + decided_counter));
             fflush(out);
         }
+        printf("%s\n", get(i));
         // Next instance
         i++;
         pthread_mutex_unlock(&mutex);
@@ -209,25 +182,21 @@ int findMajorityElement(int* arr, int size) {
     return -1;
 }
 
-
-
 int main(int argc, char**argv)
 {
+    init_kv();
     int i, err;
     int count = 0;
     int *ptr[4];
     pthread_t eval_th; // thread to check majority of value 
-   /* 
-     if (pthread_mutex_init(&lock, NULL) != 0)
-    {
-        perror("mutex init failed\n");
-        return 1;
-    }
-    */
-    if (argc != 6) { printf("Usage: %s eth1 eth2 eth3 eth4 output.txt\n", argv[0]); exit(1);}
+    pthread_t recovery_thread;
+    if (argc != 6) { printf("Usage: %s eth0 eth1 eth2 eth3 output.txt\n", argv[0]); exit(1);}
 
     for(i = 1; i < argc-1; i++) {
-        err = pthread_create(&tid[count++], NULL, recvFunc, argv[i]);
+        struct thread_args *targ = malloc(sizeof(struct thread_args));
+        targ->index = i-1;
+        targ->itf = argv[i];
+        err = pthread_create(&tid[count++], NULL, recvFunc, targ);
         if (err != 0) {
             perror("Thread create Error");
             exit(1);
@@ -243,13 +212,47 @@ int main(int argc, char**argv)
     for(i = 0; i < count; i++) {
        pthread_join(tid[i], (void**)&(ptr[i])); 
     }
-
-    sleep(20);
-    
+    sleep(10);
+    pthread_cancel(eval_th);
     cont = 0;
- 
     pthread_join(eval_th, NULL);
-
-    //printf("Main end\n");
-    //pthread_cancel(eval_th);
 }
+
+/*
+int send_multicast_socket(char* group, int port, value v) {
+
+    struct sockaddr_in server;
+    int n;
+    int sock = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sock < 0) error("create socket");
+
+    if (fcntl(sock, F_SETFL, O_NONBLOCK) < 0) error("fcntl error");
+
+    server.sin_family = AF_INET;
+    server.sin_addr.s_addr = inet_addr(group);
+    server.sin_port = htons(port);
+    unsigned int length = sizeof(struct sockaddr_in);
+
+    fd_set write_fd_set;
+    FD_ZERO(&write_fd_set);
+    FD_SET(sock, &write_fd_set);
+    
+
+    while(1) {
+        if (select(FD_SETSIZE, NULL, &write_fd_set, NULL, NULL) < 0)
+            error("select");
+      
+        if (FD_ISSET(sock, &write_fd_set)) {
+            // Run simple Paxos
+            struct header h;
+            h = v.header;
+            h.msg_type = PREPARE;
+            h.buffer_size = VALUE_SIZE;
+            int msize = sizeof(struct header) + h.buffer_size;
+            n = sendto(sock, &v, msize, 0, 
+                        (struct sockaddr *)&server, length);
+            if (n < 0) error("sendto");
+        }
+    }
+}
+*/

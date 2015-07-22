@@ -44,7 +44,7 @@ class SimpleSwitch(app_manager.RyuApp):
         ofutils.del_all_groups(dp)
         if (msg.datapath_id == 0x678cc454444f2bd8):
                 print "br0 connected"
-                ofutils.add_group(dp, 1, 3, 4, 5, 6)
+                ofutils.add_group(dp, 1, 17, 19, 21, 23, 25, 27, 29, 31)
                 ofutils.send_flow_group(dp, 1, '192.168.4.81', 
                   '192.168.4.91', 1)
                 ofutils.send_flow_group(dp, 2, '192.168.4.82', 
@@ -53,9 +53,46 @@ class SimpleSwitch(app_manager.RyuApp):
                                   '192.168.4.81', 1) 
                 ofutils.ip_src_dst_popvlan(dp, 0x0800, 4, '192.168.4.91', 
                                   '192.168.4.82', 2) 
+                ofutils.forward_ports(dp, 17, 18)
+                ofutils.forward_ports(dp, 19, 20)
+                ofutils.mod_eth_dst_vlan(dp, 5, 18, 'D4:AE:52:EA:4C:23', 9, 13)
+                ofutils.mod_eth_dst_vlan(dp, 5, 20, 'D4:AE:52:EA:49:E3', 5, 9)
 
-                ofutils.send_normal_flow(dp, 7, '192.168.4.83', 8)
-                ofutils.send_normal_flow(dp, 8, '192.168.4.80', 7)
+                # send to eth1.6(node90)
+                ofutils.forward_ports(dp, 21, 22)
+                ofutils.mod_eth_dst_vlan(dp, 5, 22, 'D4:AE:52:EA:49:E5', 6, 10)
+                # send to eth1.2(node91)
+                ofutils.forward_ports(dp, 23, 24)
+                ofutils.mod_eth_dst_vlan(dp, 5, 24, 'D4:AE:52:EA:4C:25', 2, 14)
+                # send to eth2.7(node90)
+                ofutils.forward_ports(dp, 25, 26)
+                ofutils.mod_eth_dst_vlan(dp, 5, 26, 'D4:AE:52:EA:49:E7', 7, 11)
+                # send to eth2.3(node91)
+                ofutils.forward_ports(dp, 27, 28)
+                ofutils.mod_eth_dst_vlan(dp, 5, 28, 'D4:AE:52:EA:4C:27', 3, 15)
+                # send to eth3.8(node90)
+                ofutils.forward_ports(dp, 29, 30)
+                ofutils.mod_eth_dst_vlan(dp, 5, 30, 'D4:AE:52:EA:49:E9', 8, 12)
+                # send to eth3.4(node91)
+                ofutils.forward_ports(dp, 31, 32)
+                ofutils.mod_eth_dst_vlan(dp, 5, 32, 'D4:AE:52:EA:4C:29', 4, 16)
+                #outbound traffic
+                ofutils.ip_src_dst(dp, 0x0800, 3, '192.168.3.90', 
+                                  ('192.168.3.0', '255.255.255.0'),[48]) 
+                ofutils.ip_src_dst(dp, 0x0800, 3, '192.168.3.91', 
+                                  ('192.168.3.0', '255.255.255.0'),[48]) 
+                ofutils.ip_src_dst(dp, 0x0800, 4, '192.168.4.91', 
+                                  '192.168.4.82', [2]) 
+                ofutils.ip_src_dst(dp, 0x0800, 4, '192.168.4.91', 
+                                  '192.168.4.81', [1]) 
+                #inbound traffic
+                ofutils.send_flow(dp, 0x0800, 3, '192.168.3.91', [13])
+                ofutils.send_flow(dp, 0x0800, 3, '192.168.3.90', [9])
+                ofutils.send_arp_flow(dp, 4, 
+                  ('192.168.3.0', '255.255.255.0'), [9,13,48]) # port 28 to br0
+                ofutils.send_arp_flow(dp, 4, 
+                  ('192.168.4.0', '255.255.255.0'), [1,2,9,13]) # port 28 to br0
+        
 
         elif (msg.datapath_id == 0xca13c454444f2bab):
                 print "br1 connected"

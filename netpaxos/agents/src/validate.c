@@ -3,7 +3,7 @@
 #include <string.h>
 #include "list.h"
 
-#define SIZE 10
+#define SIZE 64
 
 int check_order(FILE *file);
 
@@ -34,18 +34,21 @@ int check_order(FILE *file) {
     int count = 0;
 
     char line[SIZE];
-    char str_number[6];
+    char str_number[7];
     int sequence = 1;
     node_t *head = NULL;
     head = malloc(sizeof(node_t));
     if (head == NULL) {
         return 1;
     }
+    head->val = -1;
 
-    while ( fgets(line, SIZE, file) != NULL) /* read a line */
+    while ( fgets(line, SIZE, file) != NULL) 
     {
+        //printf("%s", line);
         strncpy(str_number, line+2, 6);
         int value = atoi(str_number);
+        //printf("%s int: %d\n",str_number, value);
         count++;
         //printf("sequence:%d\tvalue:%d\n", sequence, value);
         if (sequence == value) {
@@ -53,19 +56,21 @@ int check_order(FILE *file) {
             continue;
         }
         else if(sequence > value) {
-            reorder++;
             int index = find_list(head, value); 
-            printf("value:%d\tindex:%d\n", value, index);
+            //printf("value:%d\tindex:%d\n", value, index);
             
-            if (index != -1) 
+            if (index != -1) {
                 remove_by_index(&head, index);
+                printf("reordered value:%d\n", value);
+                reorder++;
+            }
         }
         else {
-            while (sequence < value) { /* loop until the current value */
+            while (sequence < value) { 
                 push(head, sequence);
                 sequence++;
             }
-            sequence++; /* next value */
+            sequence++; 
             //print_list(head);
             printf("----\n");
         }

@@ -17,18 +17,38 @@
 #include <limits.h>
 #include <errno.h>
 
-
+#define NUMBER_OF_VALUE 10000
 #define GROUP "239.0.1.2"
-#define PORT 8888
-#define MAX_CLIENT  1000000 // client's max sequence
+//#define GROUP "192.168.4.91"
+#define PORT 50001
+#define RECOVER_PORT 50002
+#define MAX_CLIENT   NUMBER_OF_VALUE/2 // client's max sequence
 #define BUF_SIZE 1470
 #define BILLION 1000000000L
-#define MAX_SERVER 1000000 // receiver's max sequence
+#define MAX_SERVER NUMBER_OF_VALUE - 1000 // receiver's max sequence
+#define VALUE_SIZE 128
+
+enum  message_t {
+    PREPARE,
+    PROMISE,
+    ACCEPT,
+    ACCEPTED
+};
+
+struct header {
+    short msg_type;
+    int nid;
+    int instance;
+    int round;
+    int vround;
+    int key;
+    int buffer_size;
+};
 
 typedef struct values {
-    int client_id;
-    int sequence;
-    struct timespec ts;
+    struct header header;
+    //char key[VALUE_SIZE];
+    char value[VALUE_SIZE];
 } value;
 
 
@@ -39,8 +59,11 @@ typedef struct paxosvals {
     int vval;
 } paxosval;
 
-void serialize_value(value v, char* buffer);
-void deserialize_value(char* buffer, value *v);
 uint64_t timediff(struct timespec start, struct timespec end);
 paxosval new_value(int inst, int crnd, int vrnd, int vval);
 void netpaxos_to_string(char *str, paxosval p); 
+void header_to_string(char *str, struct header hd); 
+void error(const char *msg);
+char *get_interface_addr(char *itfname);
+void addMembership(int *sock, char *group, char *itf_addr);
+int newInterfaceBoundSocket(char *itf);
