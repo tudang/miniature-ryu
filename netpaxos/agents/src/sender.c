@@ -1,46 +1,17 @@
 /* UDP client in the internet domain */
 #include "value.h"
+int put(char *key, char *value);
+int update(char *key, char *value);
+int get(char *key);
+int delete(char *key);
 
 void usage(char *program);
 void parseArguments(int argc, char **argv, int *t, int *N, int *id);
 void *recvMsg(void *arg);
+struct timespec submitValue(int sock, char* str, int len, int nid, int count);
 struct timespec send_tbl[MAX_CLIENT] = {1,1};
-
-struct timespec submitValue(int sock, char* str, int len, int client_id, int count) {
-    struct timespec tsp;
-    struct sockaddr_in server;
-    server.sin_family = AF_INET;
-    server.sin_addr.s_addr = inet_addr(GROUP);
-    server.sin_port = htons(PORT);
-    size_t length = sizeof(struct sockaddr_in);
-    value v;
-    clock_gettime(CLOCK_REALTIME, &tsp);
-    struct header h;
-    h.msg_type = ACCEPT;
-    h.client_id = client_id;
-    h.sequence = count;
-    h.ts = tsp;
-    h.buffer_size = len;
-    v.header = h;
-    strncpy(v.buffer, str, len);
-    size_t msize = sizeof(struct header) + h.buffer_size;
-    int n = sendto(sock, &v, msize, 0, 
-                (struct sockaddr *)&server, length);
-    if (n < 0) error("sendto");
-    send_tbl[count] = tsp;
-    return tsp;
-}
-
-int submitValues(int sock, char *str, int len, int N, int client_id, struct timespec req) {
-    int count = 1;
-    while (count < MAX_CLIENT) {
-        submitValue(sock, str, len, client_id, count); 
-        count++;
-        if ((count % N) == 0) 
-            nanosleep(&req, (struct timespec *)NULL);
-    }
-    return count;
-}
+int submitValues(int sock, char *str, int len, int N, int nid, struct timespec req);
+static void random_string(char *s, const int len);
 
 int main(int argc, char **argv) {
     pthread_t sth, rth; // thread identifier
@@ -50,7 +21,7 @@ int main(int argc, char **argv) {
     unsigned int length;
     int t = 1; // Number of nanoseconds to sleep
     int N = 1; // Number of message sending every t ns
-    int client_id = 81; // Client id
+    int nid = 1; // node_id
     struct timespec tstart, tend;
     struct timespec req = {0, t};
 
@@ -58,14 +29,14 @@ int main(int argc, char **argv) {
         usage(argv[0]);
         exit(1);
     }
-    parseArguments(argc, argv, &t, &N, &client_id);
+    parseArguments(argc, argv, &t, &N, &nid);
     char *myniccard = argv[optind];
     char *itf_addr = get_interface_addr(myniccard);
     /* Create socket */
     int sock;
     sock = socket(AF_INET, SOCK_DGRAM, 0);
     if (sock < 0) error("socket");
-    if (fcntl(sock, F_SETFL, O_NONBLOCK) < 0) error("fcntl error");
+    //if (fcntl(sock, F_SETFL, O_NONBLOCK) < 0) error("fcntl error");
     int ttl = 1; 
     setsockopt (sock, IPPROTO_IP, IP_TTL, &ttl, sizeof(ttl));
     local.sin_family = AF_INET;
@@ -74,14 +45,11 @@ int main(int argc, char **argv) {
     bind(sock, (struct sockaddr *)&local, sizeof(local));
     /* Create worker thread */
     pthread_create(&rth, NULL, recvMsg, (void*)&sock);
-    /* Sending in Main thread */
-    fd_set write_fd_set;
-    FD_ZERO(&write_fd_set);
-    FD_SET(sock, &write_fd_set);
     // get time start sending
     clock_gettime(CLOCK_REALTIME, &tstart);
-    char sample[] = "Test value";
-    int count = submitValues(sock, sample, strlen(sample), N, client_id,  req); 
+    char *sample = malloc(VALUE_SIZE);
+    random_string(sample, VALUE_SIZE);
+    int count = submitValues(sock, sample, strlen(sample), N, nid, req); 
     // get time end sending
     clock_gettime(CLOCK_REALTIME, &tend);
     float duration = timediff(tstart, tend) / BILLION;
@@ -93,8 +61,8 @@ int main(int argc, char **argv) {
     printf("Main exit.\n"); 
     return 0;
 }
+
 void *recvMsg(void *arg) {
-    fd_set read_fd_set;
     int sock = *((int*) arg);
     char recvbuf[BUF_SIZE];
     struct timeval timeout = {30, 0};
@@ -102,26 +70,19 @@ void *recvMsg(void *arg) {
     int last_id;
     long long int total_latency = 0;
     int count = 0;
-    FD_ZERO(&read_fd_set);
-    FD_SET(sock, &read_fd_set);
     while(1) {
-        int activity = select(sock+1, &read_fd_set, NULL, NULL, NULL);
-        if (activity) {
-            if(FD_ISSET(sock, &read_fd_set)) {
-                int seq = 0;
-                int n = recvfrom(sock, &seq, sizeof(seq), 0, NULL, NULL);
-                if (n < 0) error("recvfrom");
-                int current_id = ntohl(seq);
-                //printf("last_id:%d\n", last_id);
-                if (current_id == last_id) continue;
-                last_id = current_id;
-                struct timespec end;
-                clock_gettime(CLOCK_REALTIME, &end);
-                uint64_t diff = timediff(send_tbl[last_id], end);
-                total_latency += (diff / 2000);
-                count++;
-            }
-        } 
+        int seq = 0;
+        int n = recvfrom(sock, &seq, sizeof(seq), 0, NULL, NULL);
+        if (n < 0) error("recvfrom");
+        int current_id = ntohl(seq);
+        //printf("last_id:%d\n", last_id);
+        if (current_id == last_id) continue;
+        last_id = current_id;
+        struct timespec end;
+        clock_gettime(CLOCK_REALTIME, &end);
+        uint64_t diff = timediff(send_tbl[last_id], end);
+        total_latency += (diff / 2000);
+        count++;
         // if ((count%100000) == 0) 
         if ((count%100) == 0) { // For DEBUG
             printf("Avg. Latency: %ld / %d = %3.2f us\n", total_latency, count,
@@ -129,7 +90,6 @@ void *recvMsg(void *arg) {
         }
         
     }
-    return NULL;
 }
 
 void usage(char *program) {
@@ -181,3 +141,50 @@ void parseArguments(int argc, char **argv, int *t, int *N, int *id) {
     */
 }
 
+struct timespec submitValue(int sock, char* str, int len, int nid, int count) {
+    struct timespec tsp;
+    struct sockaddr_in server;
+    server.sin_family = AF_INET;
+    server.sin_addr.s_addr = inet_addr(GROUP);
+    server.sin_port = htons(PORT);
+    size_t length = sizeof(struct sockaddr_in);
+    value v;
+    clock_gettime(CLOCK_REALTIME, &tsp);
+    struct header h;
+    h.msg_type = ACCEPT;
+    h.nid = nid;
+    h.instance = count;
+    h.round = 1;
+    h.vround = 0;
+    h.key = (count << 4) + nid;
+    h.buffer_size = len;
+    v.header = h;
+    strncpy(v.value, str, len);
+    size_t msize = sizeof(struct header) + h.buffer_size;
+    int n = sendto(sock, &v, msize, 0, 
+                (struct sockaddr *)&server, length);
+    if (n < 0) error("sendto");
+    send_tbl[count] = tsp;
+    return tsp;
+}
+
+int submitValues(int sock, char *str, int len, int N, int nid, struct timespec req) {
+    int count = 1;
+    while (count < MAX_CLIENT) {
+        submitValue(sock, str, len, nid, count); 
+        count++;
+        if ((count % N) == 0) 
+            nanosleep(&req, (struct timespec *)NULL);
+    }
+    return count;
+}
+
+static void random_string(char *s, const int len)
+{
+    int i;
+    static const char alphanum[] =
+        "0123456789abcdefghijklmnopqrstuvwxyz";
+    for (i = 0; i < len-1; ++i)
+        s[i] = alphanum[rand() % (sizeof(alphanum) - 1)];
+    s[len-1] = 0;
+}

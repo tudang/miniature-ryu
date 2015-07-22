@@ -46,12 +46,12 @@ int main(int argc, char**argv)
             case PROMISE:
                 break;
             case ACCEPT:
-                values[instance] = h.sequence;
-                paxos_value = new_value(instance++, 1, 1, h.sequence);
+                values[instance] = h.key;
+                paxos_value = new_value(instance++, 1, 1, h.key);
                 netpaxos_to_string(str_pval, paxos_value);
                 fprintf(out, "%s", str_pval);
                 // response to sender
-                int seq = htonl(h.sequence);
+                int seq = htonl(h.key >> 4);
                 n = sendto(sockfd,&seq,sizeof(seq), 0, (struct sockaddr *)&cliaddr, len);
                 if (n < 0) error("sendto");
                 break;

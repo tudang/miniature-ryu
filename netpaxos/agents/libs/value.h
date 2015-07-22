@@ -17,7 +17,7 @@
 #include <limits.h>
 #include <errno.h>
 
-#define NUMBER_OF_VALUE 1000000
+#define NUMBER_OF_VALUE 10000
 #define GROUP "239.0.1.2"
 //#define GROUP "192.168.4.91"
 #define PORT 50001
@@ -26,7 +26,7 @@
 #define BUF_SIZE 1470
 #define BILLION 1000000000L
 #define MAX_SERVER NUMBER_OF_VALUE - 1000 // receiver's max sequence
-#define VALUE_SIZE 1430
+#define VALUE_SIZE 128
 
 enum  message_t {
     PREPARE,
@@ -36,16 +36,19 @@ enum  message_t {
 };
 
 struct header {
-    int msg_type;
-    int client_id;
-    int sequence;
-    struct timespec ts;
+    short msg_type;
+    int nid;
+    int instance;
+    int round;
+    int vround;
+    int key;
     int buffer_size;
 };
 
 typedef struct values {
     struct header header;
-    char buffer[VALUE_SIZE];
+    //char key[VALUE_SIZE];
+    char value[VALUE_SIZE];
 } value;
 
 

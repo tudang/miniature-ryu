@@ -23,8 +23,8 @@ void netpaxos_to_string(char *str, paxosval p) {
 
 
 void header_to_string(char *str, struct header hd) {
-    sprintf(str, "%d,%d,%d,%d.%d,%d", hd.msg_type, hd.client_id,
-                hd.sequence, hd.ts.tv_sec, hd.ts.tv_nsec, hd.buffer_size);
+    sprintf(str, "type: %d, nid: %d, instance: %d, round %d, vround %d, key %d", 
+                hd.msg_type, hd.nid, hd.instance, hd.round, hd.vround, hd.key);
 }
 
 void error(const char *msg) {

@@ -80,14 +80,11 @@ void *recvFunc(void *arg)
         value v;
         n=recvfrom(sockfd, &v,sizeof(value),0,(struct sockaddr *)&cliaddr,&len);
         struct header h = v.header;
-        fprintf(out, "%2.d%.6d\n", h.client_id, h.sequence);
         char hdr[40];
-        //header_to_string(hdr, h);
-        //fprintf(stdout, "%.1d,%.2d,%.6d,%.d,%s\n", h.msg_type, h.client_id, 
-        //                                            h.sequence, h.buffer_size, v.buffer);
-        
+        header_to_string(hdr, h);
+        printf("%s\n", hdr);
         inst++;
-        int seq = htonl(h.sequence);
+        int seq = htonl((h.key >> 4));
         n=sendto(sockfd,&seq,sizeof(seq),0,(struct sockaddr *)&cliaddr,len);
     } while (inst < MAX_SERVER - 1);
 
