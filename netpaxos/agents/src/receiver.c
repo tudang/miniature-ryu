@@ -46,8 +46,14 @@ void *recvFunc(void *arg)
     int inst = 1;
     value v; 
 
-    int sockfd = newInterfaceBoundSocket(itf);
+    //int sockfd = newInterfaceBoundSocket(itf);
+    int sockfd = newUDPSocket();
 
+    int yes = 1;
+    if ( setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1 )
+    {
+        perror("setsockopt");
+    }
  
     bzero(&servaddr,sizeof(servaddr));
     servaddr.sin_family = AF_INET;

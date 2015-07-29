@@ -73,3 +73,21 @@ int newInterfaceBoundSocket(char *itf) {
     } 
     return sockfd;
 }
+
+int newUDPSocket() {
+    int sockfd = socket(AF_INET,SOCK_DGRAM,0);
+    if (sockfd < 0) {
+        error("ERROR opening socket");
+        exit(1);
+    }
+    return sockfd;
+}
+
+
+void bindToDevice(int sockfd, char *itf) {
+    if (setsockopt(sockfd, SOL_SOCKET, SO_BINDTODEVICE, 
+                            itf, strlen(itf)) < 0) {
+        perror("Setsockopt Error\n");
+        exit(1);    
+    } 
+}
