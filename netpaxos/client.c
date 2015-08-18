@@ -1,7 +1,6 @@
 /* UDP client in the internet domain */
 #include <pthread.h>
 #include <sys/types.h>
-#include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
@@ -13,6 +12,7 @@
 #include <sys/time.h>
 #include <sys/fcntl.h>
 #include <ctype.h>
+#include <sys/poll.h>
 
 #include "config.h"
 
@@ -21,8 +21,6 @@ struct server {
     struct sockaddr_in server;
     unsigned int length;
 };
-
-struct timespec send_tbl[MAX_NUM] = {1,1};
 
 void error(const char *msg)
 {
@@ -39,45 +37,32 @@ uint64_t timediff(struct timespec start, struct timespec end)
 
 void *recvMsg(void *arg)
 {
-    fd_set read_fd_set;
     struct server *s = (struct server*) arg;
     int sock = s->socket;
-    char recvbuf[BUF_SIZE];
-    struct timeval timeout = {30, 0};
-    char last_msg[6];
-    int last_id;
-    long long int total_latency = 0;
     int count = 0;
-
-    FD_ZERO(&read_fd_set);
-    FD_SET(sock, &read_fd_set);
-
+    struct timespec ret;
+    double total_latency = 0.0;
+    struct pollfd ufd = { .fd = sock, .events = POLLIN | POLLPRI, .revents = 0 };
     while(1) {
-        int activity = select(sock+1, &read_fd_set, NULL, NULL, NULL);
-        if (activity) {
-            if(FD_ISSET(sock, &read_fd_set)) {
-                int n = recvfrom(sock, recvbuf, BUF_SIZE, 0, NULL, NULL);
-                if (n < 0) error("recvfrom");
-                strncpy(last_msg, recvbuf+2, 6);
-                last_id = atoi(last_msg);
-                struct timespec end;
-                clock_gettime(CLOCK_REALTIME, &end);
-                uint64_t diff = timediff(send_tbl[last_id], end);
-                total_latency += (diff / 2000);
-                count++;
-                // printf("recv %d bytes: %s\n", n, recvbuf);
-            }
-        } 
-        
-        if ((count%100000) == 0)
-        {
-            printf("Avg. Latency: %ld / %d = %3.2f us\n", total_latency, count,
-            ((float) total_latency / count));
+        int rv = poll(&ufd, 1, 1000);
+        if (rv == -1) {
+            perror("poll");
+            exit(-1);
         }
-        
+        else if (rv == 0) {
+            return NULL;
+        } 
+        else {
+            int n = recvfrom(sock, &ret, sizeof(ret), 0, NULL, NULL);
+            if (n < 0) error("recvfrom");
+            struct timespec end;
+            clock_gettime(CLOCK_REALTIME, &end);
+            uint64_t diff = timediff(ret, end);
+            total_latency += (diff / 2000);
+            count++;
+        }
     }
-
-
+    printf("average latency: %3.2f\n", (total_latency / count));
     return NULL;
 }
 
@@ -89,13 +74,12 @@ int main(int argc, char **argv)
     unsigned int length;
     struct server *serv;
     int c;
-    int t = 1; // Number of nanoseconds to sleep
+    int interval = 1000000; // Number of nanoseconds to sleep
     int N = 1; // Number of message sending every t ns
-    int client_id = 81; // Client id
 
     serv = malloc(sizeof(struct server));
 
-    while  ((c = getopt (argc, argv, "n:t:c:")) != -1) {
+    while  ((c = getopt (argc, argv, "n:t:")) != -1) {
         switch(c)
         {
             case 'n':
@@ -103,15 +87,11 @@ int main(int argc, char **argv)
                 break;
 
             case 't':
-                t = atoi(optarg);
-                break;
-
-            case 'c':
-                client_id = atoi(optarg);
+                interval = atoi(optarg);
                 break;
 
             default:
-                error("missing arguments");
+                error("invalid arguments");
         }
     }
     /* Create socket */
@@ -124,7 +104,6 @@ int main(int argc, char **argv)
         perror("fcntl error");
         exit(1);
     }
-    
     
     server_addr.sin_family = AF_INET;
     hp = gethostbyname(SERVER);
@@ -145,57 +124,43 @@ int main(int argc, char **argv)
     pthread_create(&rth, NULL, recvMsg, (void*) serv);
 
     /* Sending in Main thread */
-    fd_set write_fd_set;
-    char buffer[BUF_SIZE];
 
+    int total = 0, count = 0;
     struct timespec tsp, tstart, tend;
-    struct timespec req = {0};
-    req.tv_sec = 0;
-    req.tv_nsec = t;
+    struct timespec req = {0, interval};
 
-    int total = 0;
-    int count = 0;
-    char msgid[28];
-
-    memset(buffer, '@', BUF_SIZE);
-
-    FD_ZERO(&write_fd_set);
-    FD_SET(sock, &write_fd_set);
 
     // get time start sending
     clock_gettime(CLOCK_REALTIME, &tstart);
 
+    struct pollfd ufds = { .fd = sock, .events = POLLOUT, .revents = 0 };
+
     while (count < (MAX_NUM*0.51)) {
-        int activity = select(sock+1, NULL, &write_fd_set, NULL, NULL);
-        if (activity) {
-            if (FD_ISSET(sock, &write_fd_set)) {
-                // get timestamp and attach to message
+                int rv = poll(&ufds, 1, 1000);
+        if (rv == -1) {
+            perror("poll");
+        } else if (rv == 0) {
+            perror("timeout occured");
+        }
+        else {
+                // get timestamp and send
                 clock_gettime(CLOCK_REALTIME, &tsp);
-                sprintf(msgid, "%2d%06d%lld.%.9ld", client_id, count,
-                        (long long) tsp.tv_sec, tsp.tv_nsec);
-                strncpy(buffer, msgid, 28);
-                // put (value,timestamp)
-                send_tbl[count] = tsp;
-                int n = sendto(sock, buffer, strlen(buffer), 0, 
+                int n = sendto(sock, &tsp, sizeof(tsp), 0, 
                             (struct sockaddr *)&server_addr, length);
                 if (n < 0) error("sendto");
                 total += n;
-                //printf("send %d bytes: [%s]\n", n, msgid);
-            }
+            count++;
+            nanosleep(&req, NULL);
         }
-        count++;
-
-        if ((count % N) == 0) 
-            nanosleep(&req, (struct timespec *)NULL);
     }
     // get time end sending
     clock_gettime(CLOCK_REALTIME, &tend);
     float duration = timediff(tstart, tend) / BILLION;
 
     printf("packets/second: %3.2f\n", (float) count / duration);
-    printf("Total packets/second: %3.2f\n", ((float) count / duration) * 2);
     /* wait for our thread to finish before continuing */
-    sleep(5);
     pthread_cancel(rth);
+    pthread_join(rth, NULL);
+    free(serv);
     return 0;
 }

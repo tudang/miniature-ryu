@@ -11,26 +11,22 @@
 #include <fcntl.h>
 #include <pthread.h>
 #include <errno.h>
+#include <sys/poll.h>
 
 #include "config.h"
 
 
 pthread_t tid[4]; // this is thread identifier
 
-int values[4][MAX_NUM];  // value queues
+struct timespec values[4][MAX_NUM];  // value queues
 int start_receiving = 0;
 pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
-int idx = 0;
 
-pthread_cond_t      cond  = PTHREAD_COND_INITIALIZER;
-pthread_mutex_t     mutex = PTHREAD_MUTEX_INITIALIZER;
 
-int cont = 1; // share variable between main & eval thread
-
-struct thread_args {
-    int index;
-    char *itf;
-};
+typedef struct interface {
+    char *name;
+    int idx;
+} interface;
 
 uint64_t timediff(struct timespec start, struct timespec end)
 {
@@ -41,57 +37,53 @@ uint64_t timediff(struct timespec start, struct timespec end)
 /* This is thread function */
 void *recvFunc(void *arg)
 {
-    int sockfd, n;
+    interface *itf = (interface*) arg;
+    printf("%d %s\n", itf->idx, itf->name);
+    int sock, n;
     struct sockaddr_in servaddr,cliaddr;
     socklen_t len;
-    char mesg[BUF_SIZE];
-    char *itf;
-    itf = (char*)arg; 
-    pthread_mutex_lock(&lock);
-    int index = idx++;
-    pthread_mutex_unlock(&lock);
-    pthread_t self_id;
-    self_id = pthread_self();
-    char last_msg[9];
-    int last_id = 0;
-    int inst = 0;
-    sockfd=socket(AF_INET,SOCK_DGRAM,0);
-    if (setsockopt(sockfd, SOL_SOCKET, SO_BINDTODEVICE, 
-                            itf, strlen(itf)) < 0) 
+    int idx = itf->idx;
+
+    sock=socket(AF_INET,SOCK_DGRAM,0);
+    if (setsockopt(sock, SOL_SOCKET, SO_BINDTODEVICE, 
+                            itf->name, strlen(itf->name)) < 0) 
     {
         perror("Setsockopt Error\n");
         exit(1);    
     } 
 
- 
     bzero(&servaddr,sizeof(servaddr));
     servaddr.sin_family = AF_INET;
     servaddr.sin_addr.s_addr=htonl(INADDR_ANY);
     servaddr.sin_port=htons(PORT);
-    bind(sockfd,(struct sockaddr *)&servaddr,sizeof(servaddr));
+    bind(sock,(struct sockaddr *)&servaddr,sizeof(servaddr));
     
-    
-    char buf[BUF_SIZE];
+    struct timespec mesg = {0, 0};
     len = sizeof(cliaddr);
-    // Receive the first message
-    n = recvfrom(sockfd,mesg,BUF_SIZE,0,(struct sockaddr *)&cliaddr,&len);
-    strncpy(last_msg, mesg, 8);
-    last_id = atoi(last_msg);
-    values[index][inst++] = last_id;  
-    n = sendto(sockfd,last_msg,strlen(last_msg), 0, (struct sockaddr *)&cliaddr, len);
-    start_receiving = 1;
-
-    // Subsequent messages
-    while (inst < MAX_NUM)
-    {
-        n = recvfrom(sockfd,mesg,BUF_SIZE,0,(struct sockaddr *)&cliaddr,&len);
-        strncpy(last_msg, mesg, 8);
-        last_id = atoi(last_msg);
-        values[index][inst] = last_id;  
-        inst++;
-        if (index == 0) n = sendto(sockfd,last_msg,strlen(last_msg), 0, (struct sockaddr *)&cliaddr, len);
+    int inst = 0;
+    struct pollfd ufd = { .fd = sock, .events = POLLIN | POLLPRI, .revents = 0 };
+    while(inst < MAX_NUM) {
+        int rv = poll(&ufd, 1, 5000);
+        if (rv == -1) {
+            perror("poll");
+            exit(-1);
+        }
+        else if (rv == 0) {
+            break;
+        } 
+        else {
+            n = recvfrom(sock,&mesg,sizeof(mesg),0,(struct sockaddr *)&cliaddr,&len);
+            if (n < 0) 
+                perror("recvfrom");
+            values[idx][inst] = mesg;  
+            inst++;
+            if (idx == 0) {
+                n = sendto(sock,&mesg,sizeof(mesg), 0, (struct sockaddr *)&cliaddr, len);
+                if (n < 0) 
+                    perror("sendto");
+            }
+       }
     }
-    pthread_exit(&last_id);
     return NULL;
 }
 
@@ -101,52 +93,49 @@ void eval()
     int i,j;
     for (i = 0; i < MAX_NUM; i++) {
         for (j = 0; j < 4; j++) {
-            printf("%-8d\t", values[j][i]);
+            struct timespec ts = values[j][i];
+            printf("%lld.%.9ld\t", (long long)ts.tv_sec, ts.tv_nsec);
         }
         printf("\n");
     }
 }
 
-int findMajorityElement(int* arr, int size) {
-    int count = 0, i, majorityElement;
-    for (i = 0; i < size; i++) {
-        if (count == 0)
-            majorityElement = arr[i];
-        if (arr[i] == majorityElement)
-            count++;
-        else
-            count--;
-    }
-    count = 0;
-    for (i = 0; i < size; i++)
-        if (arr[i] == majorityElement)
-            count++;
-    if (count > size/2)
-        return majorityElement;
-    return -1;
+
+void usage(char* prog) {
+    printf("Usage: %s eth*\n", prog);
+     exit(1);
 }
-
-
-
 int main(int argc, char**argv)
 {
     int i, err;
-    int count = 0;
     int *ptr[4];
-    if (argc != 5) { printf("Usage: ./server eth0.5 eth1.6 eth2.7 eth3.8\n"); exit(1);}
+    if (argc < 2) usage(argv[0]);
+    int cols = argc - 1;
 
-    for(i = 1; i < argc; i++) {
-        err = pthread_create(&tid[count++], NULL, recvFunc, argv[i]);
+    interface **nics = calloc(cols, sizeof(interface));
+    for(i = 0; i < cols; i++) {
+        interface *nic_x = malloc(sizeof(interface));
+        nic_x->idx = i;
+        nic_x->name = strdup(argv[i+1]);
+        printf("Main: %d %s\n", nic_x->idx, nic_x->name);
+        err = pthread_create(&tid[i], NULL, recvFunc, nic_x);
         if (err != 0) {
             perror("Thread create Error");
             exit(1);
         }
+        nics[i] = nic_x;
     }
 
-    for(i = 0; i < count; i++) {
-       pthread_join(tid[i], (void**)&(ptr[i])); 
+    for(i = 0; i < cols; i++) {
+       pthread_join(tid[i], NULL); 
     }
-
     eval();
+
+    /* release memory */ 
+    for(i = 0; i < cols; i++) {
+       free(nics[i]->name);
+       free(nics[i]);
+    }
+    free(nics);
     return 0;
 }
