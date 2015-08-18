@@ -12,11 +12,8 @@
 #include <pthread.h>
 #include <errno.h>
 
+#include "config.h"
 
-#define PORT 8888
-#define SIZE 1470
-#define MAX_NUM 1000000 + 1
-#define BILLION 1000000000L
 
 pthread_t tid[4]; // this is thread identifier
 
@@ -47,7 +44,7 @@ void *recvFunc(void *arg)
     int sockfd, n;
     struct sockaddr_in servaddr,cliaddr;
     socklen_t len;
-    char mesg[SIZE];
+    char mesg[BUF_SIZE];
     char *itf;
     itf = (char*)arg; 
     pthread_mutex_lock(&lock);
@@ -55,7 +52,6 @@ void *recvFunc(void *arg)
     pthread_mutex_unlock(&lock);
     pthread_t self_id;
     self_id = pthread_self();
-    //printf("index:%d interface %s\n", index, itf);
     char last_msg[9];
     int last_id = 0;
     int inst = 0;
@@ -75,10 +71,10 @@ void *recvFunc(void *arg)
     bind(sockfd,(struct sockaddr *)&servaddr,sizeof(servaddr));
     
     
-    char buf[SIZE];
+    char buf[BUF_SIZE];
     len = sizeof(cliaddr);
     // Receive the first message
-    n = recvfrom(sockfd,mesg,SIZE,0,(struct sockaddr *)&cliaddr,&len);
+    n = recvfrom(sockfd,mesg,BUF_SIZE,0,(struct sockaddr *)&cliaddr,&len);
     strncpy(last_msg, mesg, 8);
     last_id = atoi(last_msg);
     values[index][inst++] = last_id;  
@@ -88,107 +84,28 @@ void *recvFunc(void *arg)
     // Subsequent messages
     while (inst < MAX_NUM)
     {
-        n = recvfrom(sockfd,mesg,SIZE,0,(struct sockaddr *)&cliaddr,&len);
+        n = recvfrom(sockfd,mesg,BUF_SIZE,0,(struct sockaddr *)&cliaddr,&len);
         strncpy(last_msg, mesg, 8);
         last_id = atoi(last_msg);
         values[index][inst] = last_id;  
         inst++;
-        n = sendto(sockfd,last_msg,strlen(last_msg), 0, (struct sockaddr *)&cliaddr, len);
+        if (index == 0) n = sendto(sockfd,last_msg,strlen(last_msg), 0, (struct sockaddr *)&cliaddr, len);
     }
-    printf("index:%d interface %s instance: %d\n", index, itf, inst);
     pthread_exit(&last_id);
     return NULL;
 }
 
-void *evalFunc(void *args)
+
+void eval()
 {
-    int learn[MAX_NUM];
-    while (start_receiving == 0) {sleep(1);}
-    printf("start eval\n");
-    struct timespec tstart={0,0}, tend={0,0}, res;
-    clock_gettime(CLOCK_REALTIME, &tstart);
-    int j, i = 0, k = 0;
-    int decided_counter = 0;
-    int undecided_counter = 0;
-
-
-    FILE *out;
-    char filename[20];
-    char *tname;
-    tname  = (char *)args;
-    sprintf(filename, "/tmp/%s", tname);
-    printf("filename:%s\n", filename);
-    out = fopen(filename ,"w");
-
-    if (out == NULL) {
-        perror("Error opening file");
-        exit(1);
-    }
-
-    int rc;
-    struct timespec ts;
-    
-
-    while (cont && i < MAX_NUM) { 
-        rc = pthread_mutex_lock(&mutex);
-        if (rc != 0) error("mutex lock");
-        clock_gettime(CLOCK_REALTIME, &ts);
-        ts.tv_sec += 1; // WAIT_TIME_SECONDS;
-        int an_instance[4];
+    int i,j;
+    for (i = 0; i < MAX_NUM; i++) {
         for (j = 0; j < 4; j++) {
-            if (values[j][i] != 0)  {
-                an_instance[j] = values[j][i];
-                //printf("%.8d  ", values[j][i]);
-            } 
-            else  {
-                while (values[j][i] == 0)  {
-                    rc = pthread_cond_timedwait(&cond, &mutex, &ts);
-                    if (rc == ETIMEDOUT) {
-                        //printf("Thread blocked: interface %d\n", j);
-                        //printf("Wait timed out!\n");
-                        an_instance[j] = -1;
-                        //printf("%8s ", "");
-                        break;
-                    }
-                    else     
-                    {
-                        an_instance[j] = values[j][i];
-                        printf("Wait not timed out!\n");
-                    }
-                }
-            }
+            printf("%-8d\t", values[j][i]);
         }
-        //printf("\n");
-        int selected = findMajorityElement(an_instance, 4); 
-        if (selected != -1) decided_counter++;
-        else undecided_counter++;
-       
-        //printf("inst:%d chosen:%8d\n", i, selected);
-        learn[k++] = selected;
-        fprintf(out, "%d\n", selected);
-        // aggregate latency
-        if ((i%100000) == 0) {
-            clock_gettime(CLOCK_REALTIME, &tend);
-            uint64_t res = timediff(tstart, tend);
-            double duration =  res*1.0e-9;
-            //printf("Duration: %.6f\n", duration);
-            printf("pps: %0.f\t", ((double) (undecided_counter + decided_counter) / duration));
-            printf("indecision: %.5f\n",(double)undecided_counter / (undecided_counter + decided_counter));
-            fflush(out);
-        }
-        // Next instance
-        i++;
-        pthread_mutex_unlock(&mutex);
+        printf("\n");
     }
-
-    int thid;
-    for(thid = 0; thid < 4; thid++) {
-       pthread_cancel(tid[thid]);
-    }
-    fclose(out);
-    printf("End Eval thread. instance:%d\n", i);
 }
-
 
 int findMajorityElement(int* arr, int size) {
     int count = 0, i, majorityElement;
@@ -216,17 +133,9 @@ int main(int argc, char**argv)
     int i, err;
     int count = 0;
     int *ptr[4];
-    pthread_t eval_th; // thread to check majority of value 
-   /* 
-     if (pthread_mutex_init(&lock, NULL) != 0)
-    {
-        perror("mutex init failed\n");
-        return 1;
-    }
-    */
-    if (argc != 6) { printf("Usage: ./server eth1 eth2 eth3 eth4 output.txt\n"); exit(1);}
+    if (argc != 5) { printf("Usage: ./server eth0.5 eth1.6 eth2.7 eth3.8\n"); exit(1);}
 
-    for(i = 1; i < argc-1; i++) {
+    for(i = 1; i < argc; i++) {
         err = pthread_create(&tid[count++], NULL, recvFunc, argv[i]);
         if (err != 0) {
             perror("Thread create Error");
@@ -234,22 +143,10 @@ int main(int argc, char**argv)
         }
     }
 
-    err = pthread_create(&eval_th, NULL, evalFunc, argv[argc-1]);
-    if (err != 0) {
-        perror("Thread create Error");
-        exit(1);
-    }
-
     for(i = 0; i < count; i++) {
        pthread_join(tid[i], (void**)&(ptr[i])); 
     }
 
-    sleep(2);
-    
-    cont = 0;
- 
-    pthread_join(eval_th, NULL);
-
-    printf("Main end\n");
-    //pthread_cancel(eval_th);
+    eval();
+    return 0;
 }

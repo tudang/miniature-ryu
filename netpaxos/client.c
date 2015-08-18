@@ -14,11 +14,7 @@
 #include <sys/fcntl.h>
 #include <ctype.h>
 
-#define HOST "192.168.4.91"
-#define PORT 8888
-#define MAX 1470
-#define NPACKET 500001
-#define BILLION 1000000000L
+#include "config.h"
 
 struct server {
     int socket;
@@ -26,7 +22,7 @@ struct server {
     unsigned int length;
 };
 
-struct timespec send_tbl[NPACKET] = {1,1};
+struct timespec send_tbl[MAX_NUM] = {1,1};
 
 void error(const char *msg)
 {
@@ -46,7 +42,7 @@ void *recvMsg(void *arg)
     fd_set read_fd_set;
     struct server *s = (struct server*) arg;
     int sock = s->socket;
-    char recvbuf[MAX];
+    char recvbuf[BUF_SIZE];
     struct timeval timeout = {30, 0};
     char last_msg[6];
     int last_id;
@@ -60,7 +56,7 @@ void *recvMsg(void *arg)
         int activity = select(sock+1, &read_fd_set, NULL, NULL, NULL);
         if (activity) {
             if(FD_ISSET(sock, &read_fd_set)) {
-                int n = recvfrom(sock, recvbuf, MAX, 0, NULL, NULL);
+                int n = recvfrom(sock, recvbuf, BUF_SIZE, 0, NULL, NULL);
                 if (n < 0) error("recvfrom");
                 strncpy(last_msg, recvbuf+2, 6);
                 last_id = atoi(last_msg);
@@ -131,7 +127,7 @@ int main(int argc, char **argv)
     
     
     server_addr.sin_family = AF_INET;
-    hp = gethostbyname(HOST);
+    hp = gethostbyname(SERVER);
     if (hp == NULL) error("Uknown host");
 
     bcopy((char *)hp->h_addr,
@@ -150,7 +146,7 @@ int main(int argc, char **argv)
 
     /* Sending in Main thread */
     fd_set write_fd_set;
-    char buffer[MAX];
+    char buffer[BUF_SIZE];
 
     struct timespec tsp, tstart, tend;
     struct timespec req = {0};
@@ -161,7 +157,7 @@ int main(int argc, char **argv)
     int count = 0;
     char msgid[28];
 
-    memset(buffer, '@', MAX);
+    memset(buffer, '@', BUF_SIZE);
 
     FD_ZERO(&write_fd_set);
     FD_SET(sock, &write_fd_set);
@@ -169,7 +165,7 @@ int main(int argc, char **argv)
     // get time start sending
     clock_gettime(CLOCK_REALTIME, &tstart);
 
-    while (count < NPACKET) {
+    while (count < (MAX_NUM*0.51)) {
         int activity = select(sock+1, NULL, &write_fd_set, NULL, NULL);
         if (activity) {
             if (FD_ISSET(sock, &write_fd_set)) {
@@ -201,8 +197,5 @@ int main(int argc, char **argv)
     /* wait for our thread to finish before continuing */
     sleep(5);
     pthread_cancel(rth);
-
-    printf("Main exit.\n"); 
-
     return 0;
 }
