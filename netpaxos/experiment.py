@@ -17,9 +17,9 @@ from collections import OrderedDict
 import disagree
 
   
-def client(host, args):
-    cmd = "ssh {0} \"nohup {1}/client -t {2} -n {3} > {1}/{4}/{0}.dat 2>&1 &\"".format(host, 
-                args.path, args.interval, args.rate,args.output)
+def client(host, args, client_id):
+    cmd = "ssh {0} \"nohup {1}/client -n {5} -t {2} > {1}/{3}/{0}-{4}.dat 2>&1 &\"".format(host, 
+                args.path, args.interval, args.output, client_id, int(args.instances/args.rate/2))
     logger.info(cmd)
     ssh = subprocess.Popen(shlex.split(cmd),
                         shell=False,
@@ -79,8 +79,9 @@ def main():
     pipes.append(server("node90", args, ['eth0.5', 'eth1.6', 'eth2.7', 'eth3.8']))
     pipes.append(server("node91", args, ['eth0.9', 'eth1.2', 'eth2.3', 'eth3.4']))
     time.sleep(1)
-    client("node81", args)
-    client("node82", args)
+    for i in range(args.rate):
+        client("node81", args, i)
+        client("node82", args, i)
 
     for p in pipes:
         p.wait()

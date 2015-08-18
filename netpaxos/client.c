@@ -75,7 +75,7 @@ int main(int argc, char **argv)
     struct server *serv;
     int c;
     int interval = 1000000; // Number of nanoseconds to sleep
-    int N = 1; // Number of message sending every t ns
+    int num_packets = 1000; 
 
     serv = malloc(sizeof(struct server));
 
@@ -83,9 +83,8 @@ int main(int argc, char **argv)
         switch(c)
         {
             case 'n':
-                N = atoi(optarg);
+                num_packets = atoi(optarg);
                 break;
-
             case 't':
                 interval = atoi(optarg);
                 break;
@@ -135,7 +134,7 @@ int main(int argc, char **argv)
 
     struct pollfd ufds = { .fd = sock, .events = POLLOUT, .revents = 0 };
 
-    while (count < (MAX_NUM*0.51)) {
+    while (count < num_packets) {
                 int rv = poll(&ufds, 1, 1000);
         if (rv == -1) {
             perror("poll");
