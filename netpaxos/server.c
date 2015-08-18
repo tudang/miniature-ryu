@@ -38,7 +38,6 @@ uint64_t timediff(struct timespec start, struct timespec end)
 void *recvFunc(void *arg)
 {
     interface *itf = (interface*) arg;
-    printf("%d %s\n", itf->idx, itf->name);
     int sock, n;
     struct sockaddr_in servaddr,cliaddr;
     socklen_t len;
@@ -117,7 +116,6 @@ int main(int argc, char**argv)
         interface *nic_x = malloc(sizeof(interface));
         nic_x->idx = i;
         nic_x->name = strdup(argv[i+1]);
-        printf("Main: %d %s\n", nic_x->idx, nic_x->name);
         err = pthread_create(&tid[i], NULL, recvFunc, nic_x);
         if (err != 0) {
             perror("Thread create Error");
