@@ -18,7 +18,7 @@ import disagree
 
   
 def client(host, args, client_id):
-    cmd = "ssh {0} \"nohup {1}/client -n {5} -t {2} > {1}/{3}/{0}-{4}.dat 2>&1 &\"".format(host, 
+    cmd = "ssh {0} \"nohup {1}/netpaxosclient -n {5} -t {2} > {1}/{3}/{0}-{4}.dat 2>&1 &\"".format(host, 
                 args.path, args.interval, args.output, client_id, int(args.instances/args.rate/2))
     logger.info(cmd)
     ssh = subprocess.Popen(shlex.split(cmd),
@@ -37,7 +37,7 @@ def client(host, args, client_id):
 def server(host, args, interfaces):
     logger.info("start %s" % host)
     itfs = " ".join(interfaces)
-    cmd = "ssh %s \"cd miniature-ryu/netpaxos; sudo ./server %s\"" % (host, itfs)
+    cmd = "ssh %s \"cd miniature-ryu/netpaxos; sudo ./netpaxos %s\"" % (host, itfs)
     with open("%s/%s.dat" % (args.output, host), "w+") as out:
         with open("%s/%s.err" % (args.output, host), "w+") as err:
             proc = subprocess.Popen(shlex.split(cmd),

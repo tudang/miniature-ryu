@@ -12,6 +12,8 @@
 #include <pthread.h>
 #include <errno.h>
 #include <sys/poll.h>
+#include <event2/event.h>
+#include <signal.h>
 
 #include "config.h"
 
@@ -22,9 +24,11 @@ pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 
 
 typedef struct interface {
-    char *name;
+    //char *name;
     int idx;
+    int instance;
 } interface;
+
 
 uint64_t timediff(struct timespec start, struct timespec end)
 {
@@ -32,6 +36,13 @@ uint64_t timediff(struct timespec start, struct timespec end)
                     end.tv_nsec - start.tv_nsec);
 }
 
+
+void signal_handler(evutil_socket_t fd, short what, void *arg) {
+    struct event_base *base = (struct event_base*)arg;
+    if (what&EV_SIGNAL) {
+        event_base_loopbreak(base);
+    }
+}
 
 void bindSocket(int sock, int port) {
     struct sockaddr_in servaddr;
@@ -54,45 +65,31 @@ void bindToDevice(int sock, char *iname) {
 }
 
 /* This is thread function */
-void *recvFunc(void *arg)
+void recvFunc(evutil_socket_t sock, short what, void *arg) 
+//void *recvFunc(void *arg)
 {
-    interface *itf = (interface*) arg;
-    int sock, n;
+    interface *itf = (interface*)arg;
+    int idx = itf->idx;
+    int n;
     struct sockaddr_in servaddr,cliaddr;
     socklen_t len;
-    int idx = itf->idx;
 
-    sock=socket(AF_INET,SOCK_DGRAM,0);
-    bindToDevice(sock, itf->name);
-    bindSocket(sock, PORT);
-    
     struct timespec mesg = {0, 0};
     len = sizeof(cliaddr);
-    int inst = 0;
-    struct pollfd ufd = { .fd = sock, .events = POLLIN | POLLPRI, .revents = 0 };
-    while(inst < MAX_NUM) {
-        int rv = poll(&ufd, 1, 5000);
-        if (rv == -1) {
-            perror("poll");
-            exit(-2);
-        }
-        else if (rv == 0) {
-            break;
-        } 
-        else {
-            n = recvfrom(sock,&mesg,sizeof(mesg),0,(struct sockaddr *)&cliaddr,&len);
+    if (itf->instance < MAX_NUM) {
+        n = recvfrom(sock,&mesg,sizeof(mesg),0,(struct sockaddr *)&cliaddr,&len);
+        if (n < 0) 
+            perror("recvfrom");
+        values[idx][itf->instance] = mesg;  
+        itf->instance++;
+        /* respond to client 
+        if (idx == 0) {
+            n = sendto(sock,&mesg,sizeof(mesg), 0, (struct sockaddr *)&cliaddr, len);
             if (n < 0) 
-                perror("recvfrom");
-            values[idx][inst] = mesg;  
-            inst++;
-            if (idx == 0) {
-                n = sendto(sock,&mesg,sizeof(mesg), 0, (struct sockaddr *)&cliaddr, len);
-                if (n < 0) 
-                    perror("sendto");
-            }
-       }
+                perror("sendto");
+        }
+        */
     }
-    return NULL;
 }
 
 
@@ -155,35 +152,36 @@ void usage(char* prog) {
 }
 int main(int argc, char**argv)
 {
-    int i, err;
     if (argc < 2) usage(argv[0]);
+
+    int i, err;
     int cols = argc - 1;
-    pthread_t tid[cols];
-
-    interface **nics = calloc(cols, sizeof(interface));
-    for(i = 0; i < cols; i++) {
-        interface *nic_x = malloc(sizeof(interface));
-        nic_x->idx = i;
-        nic_x->name = strdup(argv[i+1]);
-        err = pthread_create(&tid[i], NULL, recvFunc, nic_x);
-        if (err != 0) {
-            perror("Thread create Error");
-            exit(1);
-        }
-        nics[i] = nic_x;
+    struct event_base *base = event_base_new();
+    if (!base) {
+    puts("Couldn't get an event_base!");
     }
+    struct event *packet_arrive[cols];
 
     for(i = 0; i < cols; i++) {
-       pthread_join(tid[i], NULL); 
+        interface *itf = malloc(sizeof(interface));
+        itf->idx =  i;
+        itf->instance = 0;
+        int sock = socket(AF_INET,SOCK_DGRAM,0);
+        bindToDevice(sock, argv[i+1]);
+        bindSocket(sock, PORT);
+        packet_arrive[i] = event_new(base, sock, EV_READ|EV_PERSIST, recvFunc, itf);
+        event_add(packet_arrive[i], NULL);
     }
+    
+    /* Signal event to terminate event loop */
+    struct event *evsig;
+    evsig = evsignal_new(base, SIGTERM, signal_handler, base);
+    event_add(evsig, NULL);
 
+    event_base_dispatch(base);
     dump();
 
     /* release memory */ 
-    for(i = 0; i < cols; i++) {
-       free(nics[i]->name);
-       free(nics[i]);
-    }
-    free(nics);
+    event_base_free(base);
     return 0;
 }

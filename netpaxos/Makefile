@@ -1,13 +1,11 @@
 CFLAGS=-g
-LDFLAGS=-lrt -lpthread
+LDFLAGS=-lrt -lpthread -levent
 
-all: client server storage
+all: netpaxosclient netpaxos 
 
-client:	client.o config.h
+netpaxosclient:	netpaxosclient.o config.h
 
-server: server.o config.h
-
-storage: storage.o config.h
+netpaxos: netpaxos.o config.h
 
 clean:
-	rm -f *.o client server storage
+	rm -f *.o netpaxosclient netpaxos 
