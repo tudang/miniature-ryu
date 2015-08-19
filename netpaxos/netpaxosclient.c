@@ -15,12 +15,7 @@
 #include <sys/poll.h>
 
 #include "config.h"
-
-struct server {
-    int socket;
-    struct sockaddr_in server;
-    unsigned int length;
-};
+#include "netpaxosclient.h"
 
 void error(const char *msg)
 {
@@ -28,7 +23,7 @@ void error(const char *msg)
     exit(1);
 }
 
-uint64_t timediff(struct timespec start, struct timespec end)
+uint64_t tsdiff(struct timespec start, struct timespec end)
 {
     return (BILLION * (end.tv_sec - start.tv_sec) +
                     end.tv_nsec - start.tv_nsec);
@@ -57,7 +52,7 @@ void *recvMsg(void *arg)
             if (n < 0) error("recvfrom");
             struct timespec end;
             clock_gettime(CLOCK_REALTIME, &end);
-            uint64_t diff = timediff(ret, end);
+            uint64_t diff = tsdiff(ret, end);
             total_latency += (diff / 2000);
             count++;
         }
@@ -66,7 +61,7 @@ void *recvMsg(void *arg)
     return NULL;
 }
 
-int main(int argc, char **argv) 
+int run_client(int interval, int num_packets) 
 {
     pthread_t sth, rth; // thread identifier
     struct sockaddr_in server_addr;
@@ -74,25 +69,9 @@ int main(int argc, char **argv)
     unsigned int length;
     struct server *serv;
     int c;
-    int interval = 1000000; // Number of nanoseconds to sleep
-    int num_packets = 1000; 
 
     serv = malloc(sizeof(struct server));
 
-    while  ((c = getopt (argc, argv, "n:t:")) != -1) {
-        switch(c)
-        {
-            case 'n':
-                num_packets = atoi(optarg);
-                break;
-            case 't':
-                interval = atoi(optarg);
-                break;
-
-            default:
-                error("invalid arguments");
-        }
-    }
     /* Create socket */
     int sock;
     sock = socket(AF_INET, SOCK_DGRAM, 0);
@@ -154,7 +133,7 @@ int main(int argc, char **argv)
     }
     // get time end sending
     clock_gettime(CLOCK_REALTIME, &tend);
-    float duration = timediff(tstart, tend) / BILLION;
+    float duration = tsdiff(tstart, tend) / BILLION;
 
     printf("packets/second: %3.2f\n", (float) count / duration);
     /* wait for our thread to finish before continuing */

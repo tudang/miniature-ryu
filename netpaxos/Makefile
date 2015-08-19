@@ -1,11 +1,9 @@
 CFLAGS=-g
 LDFLAGS=-lrt -lpthread -levent
 
-all: netpaxosclient netpaxos 
+all: netpaxos 
 
-netpaxosclient:	netpaxosclient.o config.h
-
-netpaxos: netpaxos.o config.h
+netpaxos: netpaxos.o netpaxosclient.o netpaxoslearner.o config.h
 
 clean:
-	rm -f *.o netpaxosclient netpaxos 
+	rm -f *.o netpaxos 
