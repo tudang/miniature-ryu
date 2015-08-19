@@ -1,7 +1,5 @@
 #ifndef NETPAXOSLEARNER_H
 #define NETPAXOSLEARNER_H
-struct timespec values[4][MAX_NUM];  // value queues
-
 
 typedef struct interface {
     //char *name;

@@ -18,6 +18,7 @@
 #include "config.h"
 #include "netpaxoslearner.h"
 
+struct timespec values[4][MAX_NUM];  // value queues
 
 
 uint64_t timediff(struct timespec start, struct timespec end)
@@ -56,12 +57,11 @@ void bindToDevice(int sock, char *iname) {
 
 /* This is thread function */
 void recvFunc(evutil_socket_t sock, short what, void *arg) 
-//void *recvFunc(void *arg)
 {
     interface *itf = (interface*)arg;
     int idx = itf->idx;
     int n;
-    struct sockaddr_in servaddr,cliaddr;
+    struct sockaddr_in cliaddr;
     socklen_t len;
 
     struct timespec mesg = {0, 0};
@@ -113,9 +113,8 @@ struct timespec findMajority(int i)
             return a;
         else if (compare_ts(b,c) == 0 && compare_ts(b,d) == 0) 
             return b;
-        else
-            return ret;
     }
+    return ret;
 }
 
 void dump()
@@ -139,7 +138,7 @@ void dump()
 
 
 int run_learner(int cols, char **argv) {
-    int i, err;
+    int i;
     struct event_base *base = event_base_new();
     if (!base) {
     puts("Couldn't get an event_base!");

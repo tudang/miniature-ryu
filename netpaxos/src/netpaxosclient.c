@@ -63,12 +63,12 @@ void *recvMsg(void *arg)
 
 int run_client(int interval, int num_packets) 
 {
-    pthread_t sth, rth; // thread identifier
+    pthread_t rth;
     struct sockaddr_in server_addr;
     struct hostent *hp;
     unsigned int length;
     struct server *serv;
-    int c;
+    
 
     serv = malloc(sizeof(struct server));
 

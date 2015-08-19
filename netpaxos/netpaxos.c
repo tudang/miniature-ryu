@@ -3,6 +3,9 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include "netpaxoslearner.h"
+#include "netpaxosclient.h"
+#include "config.h"
 
 void usage(char* prog) {
     fprintf(stderr, "Usage: %s eth*\n", prog);
