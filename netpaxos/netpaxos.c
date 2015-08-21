@@ -20,7 +20,7 @@ int main(int argc, char**argv)
     int num_packets = 1;
     int index;
     int c;
-    while ((c = getopt (argc, argv, "cs:t:n:")) != -1)
+    while ((c = getopt (argc, argv, "cst:n:")) != -1)
     switch (c)
       {
       case 'c':

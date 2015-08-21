@@ -67,7 +67,7 @@ void recvFunc(evutil_socket_t sock, short what, void *arg)
     struct timespec mesg = {0, 0};
     len = sizeof(cliaddr);
     if (itf->instance < MAX_NUM) {
-        n = recvfrom(sock,&mesg,sizeof(mesg),0,(struct sockaddr *)&cliaddr,&len);
+        n = recvfrom(sock, &mesg, sizeof(mesg), 0, (struct sockaddr*)&cliaddr, &len);
         if (n < 0) 
             perror("recvfrom");
         values[idx][itf->instance] = mesg;  
@@ -141,18 +141,18 @@ int run_learner(int cols, char **argv) {
     int i;
     struct event_base *base = event_base_new();
     if (!base) {
-    puts("Couldn't get an event_base!");
+        puts("Couldn't get an event_base!");
     }
     struct event *packet_arrive[cols];
+    struct interface itf[cols];
 
     for(i = 0; i < cols; i++) {
-        interface *itf = malloc(sizeof(interface));
-        itf->idx =  i;
-        itf->instance = 0;
+        itf[i].idx = i;
+        itf[i].instance = 0;
         int sock = socket(AF_INET,SOCK_DGRAM,0);
         bindToDevice(sock, argv[i]);
         bindSocket(sock, PORT);
-        packet_arrive[i] = event_new(base, sock, EV_READ|EV_PERSIST, recvFunc, itf);
+        packet_arrive[i] = event_new(base, sock, EV_READ|EV_PERSIST, recvFunc, &itf[i]);
         event_add(packet_arrive[i], NULL);
     }
     
