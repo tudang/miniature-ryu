@@ -136,7 +136,10 @@ void dump(int rows, int cols, struct interface **itf)
         struct timespec *ret = NULL;
         findMajority(i, cols, itf, &ret);
         if (ret)
-            fprintf(stdout,"%d,%lld.%.9ld\n", i, (long long)ret->tv_sec, ret->tv_nsec);
+            if (ret->tv_sec != 0)
+                fprintf(stdout,"%d,%lld.%.9ld\n", i, (long long)ret->tv_sec, ret->tv_nsec);
+            else
+                fprintf(stdout,"%d,Indecision\n", i);
         else
             fprintf(stdout,"%d,Indecision\n", i);
     }
