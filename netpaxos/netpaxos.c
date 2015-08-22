@@ -8,7 +8,7 @@
 #include "config.h"
 
 void usage(char* prog) {
-    fprintf(stderr, "Usage: %s eth*\n", prog);
+    fprintf(stderr, "Usage: %s -c/-s -t interval -n num_instances eth*\n", prog);
      exit(1);
 }
 
@@ -42,9 +42,11 @@ int main(int argc, char**argv)
           fprintf (stderr,
                    "Unknown option character `\\x%x'.\n",
                    optopt);
+        usage(argv[0]);
         return 1;
       default:
         abort ();
+        usage(argv[0]);
       }
 
     if (cflag) {
@@ -56,7 +58,7 @@ int main(int argc, char**argv)
         for (index = optind; index < argc; index++) {
             interfaces[index - optind] = strdup(argv[index]);
         }
-        run_learner(cols, interfaces);
+        run_learner(cols, num_packets, interfaces);
     }
   return 0;
 }

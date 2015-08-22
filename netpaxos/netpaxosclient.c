@@ -17,6 +17,7 @@
 
 #include "config.h"
 #include "netpaxosclient.h"
+#include "netpaxosmsg.h"
 
 int count; 
 
@@ -42,12 +43,12 @@ void sig_handler(evutil_socket_t fd, short what, void *arg) {
 void read_cb(evutil_socket_t sock, short what, void *arg) 
 {
     if (what&EV_READ) {
-        struct timespec ret;
+        netpaxos_message msg;
         struct timespec end;
-        int n = recvfrom(sock, &ret, sizeof(ret), 0, NULL, NULL);
+        int n = recvfrom(sock, &msg, sizeof(msg), 0, NULL, NULL);
         if (n < 0) error("recvfrom");
         clock_gettime(CLOCK_REALTIME, &end);
-        uint64_t diff = tsdiff(ret, end);
+        uint64_t diff = tsdiff(msg.time, end);
         printf("%ld\n", diff / 2000);
     }
 }
@@ -61,14 +62,16 @@ void send_cb(evutil_socket_t sock, short what, void *arg)
         length = sizeof(struct sockaddr_in);
         struct timespec tsp;
         if (c->count < c->num_packet) {
-           // get timestamp and send
-           clock_gettime(CLOCK_REALTIME, &tsp);
-           int n = sendto(sock, &tsp, sizeof(tsp), 0, 
+            // get timestamp and send
+            clock_gettime(CLOCK_REALTIME, &tsp);
+            netpaxos_message msg;
+            msg.time = tsp;
+            int n = sendto(sock, &msg, sizeof(msg), 0, 
                        (struct sockaddr *)&server_addr, length);
-           if (n < 0) error("sendto");
+            if (n < 0) error("sendto");
             printf("send %d bytes\n", n);
-           c->total += n;
-           c->count++;
+            c->total += n;
+            c->count++;
         }
     }
 }

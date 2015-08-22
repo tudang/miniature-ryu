@@ -17,8 +17,8 @@
 
 #include "config.h"
 #include "netpaxoslearner.h"
+#include "netpaxosmsg.h"
 
-struct timespec values[4][MAX_NUM];  // value queues
 
 
 uint64_t timediff(struct timespec start, struct timespec end)
@@ -58,20 +58,19 @@ void bindToDevice(int sock, char *iname) {
 /* This is thread function */
 void recvFunc(evutil_socket_t sock, short what, void *arg) 
 {
-    interface *itf = (interface*)arg;
-    int idx = itf->idx;
+    interface *citf = (interface*)arg;
     int n;
     struct sockaddr_in cliaddr;
     socklen_t len;
 
-    struct timespec mesg = {0, 0};
+    netpaxos_message mesg;
     len = sizeof(cliaddr);
-    if (itf->instance < MAX_NUM) {
+    if (citf->instance < citf->num_instance) {
         n = recvfrom(sock, &mesg, sizeof(mesg), 0, (struct sockaddr*)&cliaddr, &len);
         if (n < 0) 
             perror("recvfrom");
-        values[idx][itf->instance] = mesg;  
-        itf->instance++;
+        citf->values[citf->instance] = mesg.time;  
+        citf->instance++;
         /* respond to client 
         if (idx == 0) {
             n = sendto(sock,&mesg,sizeof(mesg), 0, (struct sockaddr *)&cliaddr, len);
@@ -97,63 +96,72 @@ int compare_ts(struct timespec time1, struct timespec time2) {
 }
 
 
-struct timespec findMajority(int i)
+int findMajority(int instance, int size, interface **itf, struct timespec **majority)
 {
-    struct timespec ret  = {0,0};
-    struct timespec a = values[0][i];
-    struct timespec b = values[1][i];
-    struct timespec c = values[2][i];
-    struct timespec d = values[3][i];
-    if (compare_ts(a,b) == 0) {
-        if (compare_ts(a,c) == 0 || compare_ts(a,d) == 0) 
-            return a;
+    struct timespec *arr[size];
+    int i;
+    for (i = 0; i < size; i++) {
+        arr[i] = &itf[i]->values[instance];
     }
-    else { 
-        if (compare_ts(a,c) == 0 && compare_ts(a,d) == 0) 
-            return a;
-        else if (compare_ts(b,c) == 0 && compare_ts(b,d) == 0) 
-            return b;
+    int count = 0;
+    for (i = 0; i < size; i++) {
+        if (count == 0) 
+            *majority = arr[i];
+        if (compare_ts(*arr[i], **majority) == 0)
+            count++;
+        else
+            count--;
     }
-    return ret;
+    count = 0;
+    for (i = 0; i < size; i++) {
+        if (compare_ts(*arr[i], **majority) == 0)
+            count++;
+    }
+    if (count > size/2)
+        return 1;
+    
+    *majority = NULL;
+    return 0;
 }
 
-void dump()
+void dump(int rows, int cols, struct interface **itf)
 {
     int i,j;
-    for (i = 0; i < MAX_NUM; i++) {
-        for (j = 0; j < 4; j++) {
-            struct timespec a = values[j][i];
+    for (i = 0; i < rows; i++) {
+        for (j = 0; j < cols; j++) {
+            struct timespec a = itf[j]->values[i];
             fprintf(stderr, "%lld.%.9ld\t", (long long)a.tv_sec, a.tv_nsec);
         }
         fprintf(stderr, "\n");
-        struct timespec ret = findMajority(i);
-        if (ret.tv_sec != 0 && ret.tv_nsec != 0)
-            fprintf(stdout,"%lld.%.9ld\n", (long long)ret.tv_sec, ret.tv_nsec);
+        struct timespec *ret = NULL;
+        findMajority(i, cols, itf, &ret);
+        if (ret)
+            fprintf(stdout,"%d,%lld.%.9ld\n", i, (long long)ret->tv_sec, ret->tv_nsec);
         else
-            fprintf(stdout,"Indecision\n");
+            fprintf(stdout,"%d,Indecision\n", i);
     }
 }
 
-
-
-
-int run_learner(int cols, char **argv) {
+int run_learner(int cols, int rows, char **argv) {
     int i;
     struct event_base *base = event_base_new();
     if (!base) {
         puts("Couldn't get an event_base!");
     }
     struct event *packet_arrive[cols];
-    struct interface itf[cols];
-
+    interface **itf = malloc(cols * sizeof(interface*));
     for(i = 0; i < cols; i++) {
-        itf[i].idx = i;
-        itf[i].instance = 0;
+        interface *itfx = malloc(sizeof(interface*));
+        itfx->values = calloc(rows, sizeof(struct timespec));
+        itfx->idx = i;
+        itfx->instance = 0;
+        itfx->num_instance = rows;
         int sock = socket(AF_INET,SOCK_DGRAM,0);
         bindToDevice(sock, argv[i]);
         bindSocket(sock, PORT);
-        packet_arrive[i] = event_new(base, sock, EV_READ|EV_PERSIST, recvFunc, &itf[i]);
+        packet_arrive[i] = event_new(base, sock, EV_READ|EV_PERSIST, recvFunc, itfx);
         event_add(packet_arrive[i], NULL);
+        itf[i] = itfx;
     }
     
     /* Signal event to terminate event loop */
@@ -162,9 +170,14 @@ int run_learner(int cols, char **argv) {
     event_add(evsig, NULL);
 
     event_base_dispatch(base);
-    dump();
+    dump(rows, cols, itf);
 
     /* release memory */ 
     event_base_free(base);
+    for(i = 0; i < cols; i++) {
+        free(itf[i]->values);
+        free(itf[i]);
+    }
+    free(itf);
     return 0;
 }

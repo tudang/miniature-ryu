@@ -37,7 +37,7 @@ def client(host, args, client_id):
 def server(host, args, interfaces):
     logger.info("start %s" % host)
     itfs = " ".join(interfaces)
-    cmd = "ssh %s \"cd miniature-ryu/netpaxos; sudo ./netpaxos -s %s\"" % (host, itfs)
+    cmd = "ssh %s \"cd miniature-ryu/netpaxos; sudo ./netpaxos -s -n %d %s\"" % (host, args.instances, itfs)
     with open("%s/%s.dat" % (args.output, host), "w+") as out:
         with open("%s/%s.err" % (args.output, host), "w+") as err:
             proc = subprocess.Popen(shlex.split(cmd),

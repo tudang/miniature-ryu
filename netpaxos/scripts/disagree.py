@@ -8,22 +8,26 @@ import time
 
 def difference(fname1, fname2):
     print '{0} vs {1}'.format(fname1, fname2)
-    with open(fname1, 'r') as file1:
-        with open(fname2, 'r') as file2:
-            set1 = set(file1)
-            set2 = set(file2)
-            diff = set1.difference(set2)
-            #print "disagreement: {0:2.1f}".format(len(diff) * 100.0 / len(set2))
-    
-    bad_words = ['Indesicion', '\n']
-    disagreement = []
-    indecision = []
-    for line in diff:
-        if not any(bad_word in line for bad_word in bad_words ):
-            disagreement.append(line)
-        else:
-            indecision.append(line)
-    print "{0} {1} {2} {3}\n".format(len(set1), len(set2), len(disagreement), len(indecision))
+    disagrement = 0
+    indecision = 0
+    with open(fname1, 'r') as file1, open(fname2, 'r') as file2:
+        for (x,y) in zip(file1, file2):
+            x = x.strip()
+            y = y.strip()
+            if x == y and x != 'Indecision':
+                continue
+            elif x != y and y != 'Indecision' and x != 'Indecision':
+                disagrement += 1     
+            else:
+                indecision += 1
+    print "disagrement: {0} indecision: {1}".format(disagrement, indecision)
+    #bad_words = ['Indesicion', '\n']
+    #for line in diff:
+    #    if not any(bad_word in line for bad_word in bad_words ):
+    #        disagreement.append(line)
+    #    else:
+    #        indecision.append(line)
+    #print "{0} {1} {2} {3}\n".format(len(set1), len(set2), len(disagreement), len(indecision))
 
 def main():
     parser = argparse.ArgumentParser(description='Run NetPaxos experiment.')

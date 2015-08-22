@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-I.
+CFLAGS=-g -Wall -I.
 LIBS=-lrt -levent
 DEPS = config.h
 OBJ = netpaxos.o netpaxoslearner.o netpaxosclient.c 
