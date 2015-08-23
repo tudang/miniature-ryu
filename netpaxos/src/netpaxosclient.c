@@ -18,6 +18,7 @@
 #include "config.h"
 #include "netpaxosclient.h"
 #include "netpaxosmsg.h"
+#include "netpaxos_time.h"
 
 int count; 
 
@@ -47,9 +48,9 @@ void read_cb(evutil_socket_t sock, short what, void *arg)
         struct timespec end;
         int n = recvfrom(sock, &msg, sizeof(msg), 0, NULL, NULL);
         if (n < 0) error("recvfrom");
-        clock_gettime(CLOCK_REALTIME, &end);
+        gettime(&end);
         uint64_t diff = tsdiff(msg.time, end);
-        printf("%ld\n", diff / 2000);
+        printf("%llu\n", diff / 2000);
     }
 }
 
@@ -63,7 +64,7 @@ void send_cb(evutil_socket_t sock, short what, void *arg)
         struct timespec tsp;
         if (c->count < c->num_packet) {
             // get timestamp and send
-            clock_gettime(CLOCK_REALTIME, &tsp);
+            gettime(&tsp);
             netpaxos_message msg;
             msg.time = tsp;
             int n = sendto(sock, &msg, sizeof(msg), 0, 
@@ -124,11 +125,11 @@ int run_client(int interval, int num_packet)
     event_add(evsig, NULL);
 
     // get time start sending
-    clock_gettime(CLOCK_REALTIME, &tstart);
+    gettime(&tstart);
     event_base_dispatch(base);
 
     // get time end sending
-    clock_gettime(CLOCK_REALTIME, &tend);
+    gettime(&tend);
     float duration = tsdiff(tstart, tend) / BILLION;
 
     printf("packets/second: %3.2f\n", (float) c.count / duration);

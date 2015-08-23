@@ -18,15 +18,7 @@
 #include "config.h"
 #include "netpaxoslearner.h"
 #include "netpaxosmsg.h"
-
-
-
-uint64_t timediff(struct timespec start, struct timespec end)
-{
-    return (BILLION * (end.tv_sec - start.tv_sec) +
-                    end.tv_nsec - start.tv_nsec);
-}
-
+#include "netpaxos_time.h"
 
 void signal_handler(evutil_socket_t fd, short what, void *arg) {
     struct event_base *base = (struct event_base*)arg;
@@ -47,12 +39,16 @@ void bindSocket(int sock, int port) {
 
 
 void bindToDevice(int sock, char *iname) {
+#ifdef __MACH__ 
+
+#else
     if (setsockopt(sock, SOL_SOCKET, SO_BINDTODEVICE, 
                             iname, strlen(iname)) < 0) 
     {
         perror("Bind to device\n");
         exit(-1);
-    } 
+    }
+#endif 
 }
 
 /* This is thread function */

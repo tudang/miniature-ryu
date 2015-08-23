@@ -1,4 +1,7 @@
 /* UDP client in the internet domain */
+#ifndef _netpaxosclient_h_
+#define _netpaxosclient_h_
+
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
@@ -10,3 +13,4 @@ struct client {
 };
 
 int run_client(int interval, int num_packet);
+#endif

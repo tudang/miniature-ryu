@@ -1,5 +1,5 @@
-#ifndef CONFIG_H
-#define CONFIG_H
+#ifndef _config_h_
+#define _config_h_
 
 #define SERVER "192.168.4.91"
 #define PORT 18888
