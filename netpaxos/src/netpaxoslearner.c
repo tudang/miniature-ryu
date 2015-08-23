@@ -190,3 +190,15 @@ void setRecBuf(int sock) {
         exit(-1);
     }
 }
+
+
+int getRecBuf(int sock) {
+    int rcvbuf = 0;
+    socklen_t size = sizeof(sock);
+    int rc = getsockopt(sock, SOL_SOCKET, SO_RCVBUF, &rcvbuf, &size);
+    if (rc == -1) {
+        perror("setRecBuf");
+        exit(-1);
+    }
+    return rcvbuf;
+}
