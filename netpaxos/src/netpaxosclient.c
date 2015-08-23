@@ -50,7 +50,11 @@ void read_cb(evutil_socket_t sock, short what, void *arg)
         if (n < 0) error("recvfrom");
         gettime(&end);
         uint64_t diff = tsdiff(msg.time, end);
+#ifdef __MACH__
         printf("%llu\n", diff / 2000);
+#else
+        printf("%ld\n", diff / 2000);
+#endif
     }
 }
 

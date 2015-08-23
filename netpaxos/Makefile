@@ -3,7 +3,7 @@ TARGET   = netpaxos
 
 CC       = gcc
 # compiling flags here
-CFLAGS   = -std=c99 -Wall -I.
+CFLAGS   = -Wall -I.
 
 LINKER   = gcc -o
 # linking flags here
