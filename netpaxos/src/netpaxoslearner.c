@@ -156,6 +156,7 @@ int run_learner(int cols, int rows, char **argv) {
         itfx->instance = 0;
         itfx->num_instance = rows;
         int sock = socket(AF_INET,SOCK_DGRAM,0);
+        setRecBuf(sock);
         bindToDevice(sock, argv[i]);
         bindSocket(sock, PORT);
         packet_arrive[i] = event_new(base, sock, EV_READ|EV_PERSIST, recvFunc, itfx);
@@ -179,4 +180,13 @@ int run_learner(int cols, int rows, char **argv) {
     }
     free(itf);
     return 0;
+}
+
+void setRecBuf(int sock) {
+    int rcvbuf = 16777216;
+    int rc = setsockopt(sock, SOL_SOCKET, SO_RCVBUF, &rcvbuf, sizeof(sock));
+    if (rc == -1) {
+        perror("setRecBuf");
+        exit(-1);
+    }
 }

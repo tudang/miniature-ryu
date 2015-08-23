@@ -12,5 +12,5 @@ typedef struct interface {
 
 
 int run_learner(int cols, int rows, char **argv);
-
+void setRecBuf(int sock);
 #endif
