@@ -1,17 +1,14 @@
 #ifndef _NETPAXOS_LEARNER_H
 #define _NETPAXOS_LEARNER_H
-#include <time.h>
+#include "netpaxos_msg.h"
+
 
 typedef struct interface {
-    //char *name;
-    int idx;
     int instance;
     int num_instance;
-    struct timespec *values;
+    netpaxos_message *values;
 } interface;
 
 
 int run_learner(int cols, int rows, char **argv);
-void setRecBuf(int sock);
-int getRecBuf(int sock);
 #endif
