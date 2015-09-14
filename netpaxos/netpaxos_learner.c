@@ -68,7 +68,7 @@ int run_learner(int cols, int rows, char **argv) {
     itfx->num_instance = rows;
     int sock = socket(AF_INET,SOCK_DGRAM,0);
     setRecBuf(sock);
-    addMembership(sock, argv[0]);
+    addMembership(sock, SERVER);
     bindSocket(sock, PORT);
     recv = event_new(base, sock, EV_READ|EV_PERSIST, recvFunc, itfx);
     event_add(recv, NULL);
