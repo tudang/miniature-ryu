@@ -3,8 +3,8 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
-#include "netpaxoslearner.h"
-#include "netpaxosclient.h"
+#include "netpaxos_learner.h"
+#include "netpaxos_client.h"
 #include "config.h"
 
 void usage(char* prog) {
@@ -59,6 +59,8 @@ int main(int argc, char**argv)
             interfaces[index - optind] = strdup(argv[index]);
         }
         run_learner(cols, num_packets, interfaces);
+    } else {
+      usage(argv[0]);
     }
   return 0;
 }

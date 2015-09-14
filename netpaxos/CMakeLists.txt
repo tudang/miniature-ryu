@@ -9,5 +9,5 @@ add_subdirectory(Netpaxos)
 set (EXTRA_LIBS ${EXTRA_LIBS} netpaxos)
 
 # add the executable
-add_executable(replica netpaxos.c)
+add_executable(replica replica.c)
 target_link_libraries (replica ${EXTRA_LIBS})

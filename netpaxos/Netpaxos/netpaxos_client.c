@@ -16,8 +16,8 @@
 #include <signal.h>
 
 #include "config.h"
-#include "netpaxosclient.h"
-#include "netpaxosmsg.h"
+#include "netpaxos_client.h"
+#include "netpaxos_msg.h"
 #include "netpaxos_time.h"
 
 int count; 

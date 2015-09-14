@@ -1,5 +1,5 @@
-#ifndef _netpaxosmsg_h
-#define _netpaxosmsg_h
+#ifndef _NETPAXOS_MSG_H
+#define _NETPAXOS_MSG_H
 
 #include <time.h>
 #define MAX_BUF 1440

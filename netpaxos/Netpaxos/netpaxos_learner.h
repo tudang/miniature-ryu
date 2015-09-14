@@ -1,5 +1,5 @@
-#ifndef _netpaxoslearner_h_
-#define _netpaxoslearner_h_
+#ifndef _NETPAXOS_LEARNER_H
+#define _NETPAXOS_LEARNER_H
 #include <time.h>
 
 typedef struct interface {

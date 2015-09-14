@@ -16,8 +16,8 @@
 #include <signal.h>
 
 #include "config.h"
-#include "netpaxoslearner.h"
-#include "netpaxosmsg.h"
+#include "netpaxos_learner.h"
+#include "netpaxos_msg.h"
 #include "netpaxos_time.h"
 
 void signal_handler(evutil_socket_t fd, short what, void *arg) {

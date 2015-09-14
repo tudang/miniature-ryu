@@ -1,5 +1,5 @@
-#ifndef _netpaxos_time_h_
-#define _netpaxos_time_h_
+#ifndef _NETPAXOS_TIME_H
+#define _NETPAXOS_TIME_H
 
 #include <time.h>
 #include <sys/time.h>

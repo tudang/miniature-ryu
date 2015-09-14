@@ -1,6 +1,6 @@
 /* UDP client in the internet domain */
-#ifndef _netpaxosclient_h_
-#define _netpaxosclient_h_
+#ifndef _NETPAXOS_CLIENT_H
+#define _NETPAXOS_CLIENT_H
 
 #include <netinet/in.h>
 #include <arpa/inet.h>
