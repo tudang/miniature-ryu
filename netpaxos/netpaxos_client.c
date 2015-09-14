@@ -74,7 +74,6 @@ void send_cb(evutil_socket_t sock, short what, void *arg)
             int n = sendto(sock, &msg, sizeof(msg), 0, 
                        (struct sockaddr *)&server_addr, length);
             if (n < 0) error("sendto");
-            printf("send %d bytes\n", n);
             c->total += n;
             c->count++;
         }

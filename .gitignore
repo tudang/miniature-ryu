@@ -7,3 +7,5 @@
 *log/
 *new/
 *result-ordering/
+build/
+output/
